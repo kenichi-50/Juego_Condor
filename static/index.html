@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b2340">
+<title>Guardianes del Cóndor · Cumbres Low-Poly</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="hud oculto" id="hud" aria-label="Estado del juego">
+    <section class="jug" id="hud-j1">
+      <div class="jug-cab"><span class="jug-nombre" id="hud-j1-nombre">Cóndor</span><span class="gemas" id="hud-j1-vidas" aria-label="Vidas"></span></div>
+      <div class="barra" id="hud-j1-energia" role="progressbar" aria-label="Energía" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i></i></div>
+      <div class="vista" id="hud-j1-vista">Vista de cóndor lista</div>
+    </section>
+
+    <div class="centro">
+      <div class="nivel-nombre" id="hud-nivel">Guardianes del Cóndor</div>
+      <div class="ruta" title="Distancia al nido" aria-label="Progreso hacia el nido"><i id="hud-ruta"></i><u class="ruta-aro" title="Aro dorado"></u><b id="hud-ruta-pin"></b></div>
+      <div class="cifras">
+        <span>Puntos <b id="hud-puntos">0</b></span>
+        <span>Altitud <b id="hud-altitud">0</b> m</span>
+        <span>Páramo limpio <b id="hud-limpio">0</b>%</span>
+        <span class="combo">Planeo <b id="hud-combo">×1</b></span>
+        <span>Datos <b id="hud-datos">0</b></span>
+      </div>
+    </div>
+
+    <section class="jug der" id="hud-j2" hidden>
+      <div class="jug-cab"><span class="jug-nombre" id="hud-j2-nombre">Jugador 2</span><span class="gemas" id="hud-j2-vidas" aria-label="Vidas"></span></div>
+      <div class="barra" id="hud-j2-energia" role="progressbar" aria-label="Energía jugador 2" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i></i></div>
+      <div class="vista" id="hud-j2-vista">Vista de cóndor lista</div>
+    </section>
+  </header>
+
+  <main class="escenario" id="escenario">
+    <canvas id="lienzo" width="960" height="540" role="img" aria-label="Juego: vuela como un cóndor andino sobre el páramo del Cotopaxi"></canvas>
+    <div class="avisos">
+      <div class="consejo" id="consejo" hidden role="status"></div>
+      <div class="toasts" id="toasts" aria-live="polite"></div>
+    </div>
+    <div class="capa" id="capa"></div>
+
+    <div class="tactil" id="tactil" aria-label="Controles táctiles">
+      <div class="grupo">
+        <button type="button" data-tecla="ArrowLeft" aria-label="Frenar">◀</button>
+        <button type="button" data-tecla="ArrowRight" aria-label="Acelerar">▶</button>
+      </div>
+      <div class="grupo">
+        <button type="button" data-tecla="KeyV" aria-label="Vista de cóndor">◉</button>
+        <button type="button" data-tecla="ArrowDown" aria-label="Picada">▼</button>
+        <button type="button" class="grande" data-tecla="ArrowUp" aria-label="Aletear">▲</button>
+      </div>
+    </div>
+  </main>
+
+  <p class="girar" aria-hidden="true">Gira el celular en horizontal para jugar mejor.</p>
+
+  <footer class="pie">
+    <span>Pausa: <kbd>Esc</kbd> o <kbd>P</kbd> &nbsp; Sonido: <kbd>M</kbd></span>
+    <span>Proyecto Aplicaciones Web · FABLAB</span>
+  </footer>
+</div>
+
+<script src="js/datos.js"></script>
+<script src="js/lowpoly.js"></script>
+<script src="js/sonido.js"></script>
+<script src="js/interfaz.js"></script>
+<script src="js/juego.js"></script>
+</body>
+</html>
