@@ -82,7 +82,15 @@
   <div class="visor-caja">
     <canvas id="visor-lienzo" width="960" height="540" aria-label="Tu cóndor girando en 3D"></canvas>
     <button type="button" class="visor-cerrar" id="visor-cerrar" aria-label="Cerrar">✕</button>
-    <button type="button" class="btn principal" id="v3d-aletear">¡Aletear!</button>
+    <div class="visor-controles">
+      <label for="v3d-cabeza" class="etq">Cabeza:</label>
+      <select id="v3d-cabeza" class="seg" aria-label="Accesorio de cabeza">
+        <option value="ninguno">Sin accesorio</option>
+        <option value="chullo">Chullo andino</option>
+        <option value="sombrero">Sombrero andino</option>
+      </select>
+      <button type="button" class="btn principal" id="v3d-aletear">¡Aletear!</button>
+    </div>
   </div>
 </dialog>
 

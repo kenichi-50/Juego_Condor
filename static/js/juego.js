@@ -19,8 +19,7 @@ const Juego = (() => {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 
-  /* ---------- Estado ---------- */
-  let estado = "menu";            // menu | intro | jugando | llegando | pausa | pregunta | resumen | fin
+  let estado = "menu";
   let nivelIdx = 0, N = NIVELES[0], M = null;
   let jugadores = [], partida = null;
   let cam = 0, sacudida = 0, destello = 0, destelloColor = "255,255,255", reloj = 0, ultimo = 0, hudT = 0;
@@ -33,7 +32,6 @@ const Juego = (() => {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  /* ---------- Construcción del mundo de un nivel ---------- */
   function crearMundo(idx) {
     const n = NIVELES[idx], L = n.largo, rnd = azar(n.semilla * 977 + 13), cw = 56;
     const altura = (i) => {
@@ -44,12 +42,10 @@ const Juego = (() => {
     };
     const suelo = (x) => { const i = Math.floor(x / cw), f = x / cw - i; return lerp(altura(i), altura(i + 1), f); };
 
-    // térmicas
     const termicas = [], sp = (L - 2300) / n.termicas;
     for (let i = 0; i < n.termicas; i++) termicas.push({ x: (i === 0 ? 560 : 800 + i * sp) + (i ? (rnd() - 0.5) * sp * 0.35 : 0), w: 190 + rnd() * 70 });
-    termicas.push({ x: L - 1380, w: 280 }, { x: L - 650, w: 250 });   // corrientes del risco: ayudan a subir al nido
+    termicas.push({ x: L - 1380, w: 280 }, { x: L - 650, w: 250 });
 
-    // carroña (algunas envenenadas, nunca la primera)
     const carronas = [], spc = (L - 2900) / n.carronas;
     for (let i = 0; i < n.carronas; i++) carronas.push({ x: 900 + i * spc + rnd() * 220, venenosa: false, estado: 0, comida: 0, por: null, gal: [] });
     const idxs = carronas.map((_, i) => i).slice(1).sort(() => rnd() - 0.5).slice(0, n.venenos);
@@ -58,25 +54,21 @@ const Juego = (() => {
       if (!c.venenosa) for (let k = 0; k < 3; k++) c.gal.push({ fase: rnd() * 6, r: 26 + rnd() * 34, v: 0.5 + rnd() * 0.6, dy: rnd() * 40 });
     });
 
-    // cables con torres
     const cables = [], spk = (L - 4200) / Math.max(1, n.cables);
     for (let i = 0; i < n.cables; i++) {
       const x0 = 1700 + i * spk + rnd() * 150, x1 = x0 + 300 + rnd() * 110, y0 = 250 + rnd() * 60;
       cables.push({ x0, x1, y0, hund: 20 + rnd() * 14, lineas: rnd() > 0.5 ? [0, 42] : [0] });
     }
 
-    // cazadores
     const cazadores = [], spz = (L - 4000) / Math.max(1, n.cazadores);
     for (let i = 0; i < n.cazadores; i++) cazadores.push({ x: 1900 + i * spz + rnd() * 200, estado: "espera", t: 0, obj: null, mira: { x: 0, y: 0 }, fijo: false });
 
-    // tormentas
     const tormentas = [], spt = (L - 4600) / Math.max(1, n.tormentas);
     for (let i = 0; i < n.tormentas; i++) {
       tormentas.push({ x: 2500 + i * spt + rnd() * 120, w: 560 + rnd() * 180, y: 90 + rnd() * 40, semilla: i * 7 + 3,
         rayo: { estado: 0, t: 1.2 + rnd() * 1.5, x: 0 } });
     }
 
-    // plumas en arcos de planeo
     const plumas = [], arcos = n.plumasArcos, spa = (L - 2800) / arcos;
     for (let k = 0; k < arcos; k++) {
       const x0 = 500 + k * spa + rnd() * 120, base = 190 + rnd() * 130;
@@ -86,37 +78,31 @@ const Juego = (() => {
       }
     }
 
-    // nubes decorativas
     const nubes = Array.from({ length: 16 }, (_, i) => ({ x: rnd() * 3000, y: 40 + rnd() * 190, s: 0.6 + rnd() * 0.9, par: 0.16 + rnd() * 0.3, sem: i * 5 }));
 
-    // poderes: orbes que ayudan a llegar al nido
     const poderes = [], tiposP = n.poderes || [], spp = (L - 3400) / Math.max(1, tiposP.length);
     tiposP.forEach((tipo, i) => {
       const x = 1100 + i * spp + rnd() * 160, y = clamp(160 + rnd() * 140, 120, suelo(x) - 130);
       poderes.push({ tipo, x, y, tomado: false, fase: rnd() * 6 });
     });
 
-    // puntos de control: banderas que guardan tu avance
     const controles = [0.25, 0.5, 0.75].map((f) => ({ x: Math.round((L - 130) * f), activo: false, anim: 0 }));
 
-    const mundo = {
+    return {
       controles, control: null, poderes, L, suelo, altura, termicas, carronas, cables, cazadores, tormentas, plumas, nubes, part: [],
       nido: { x: L - 130, y: suelo(L - 130) - 6 },
       cielo: LP.crearCielo(n.cielo, n.semilla), volcan: LP.crearVolcan(n.paleta, n.semilla),
-      // el risco del nido es roca gris: la saturación baja al acercarse
       mezclaSuelo: (i) => { const t = suave(clamp((i * cw - (L - 1700)) / 900, 0, 1)), q = n.paleta.suelo; return [q[0], lerp(q[1], 9, t), lerp(q[2], q[2] + 6, t)]; },
       topLejos: (i) => 405 - 105 * (0.35 * LP.hash(i, 1, n.semilla + 1) + 0.65 * (0.5 + 0.5 * Math.sin(i * 0.55 + n.semilla))),
       topMedio: (i) => 432 - 92 * (0.4 * LP.hash(i, 2, n.semilla + 2) + 0.6 * (0.5 + 0.5 * Math.sin(i * 0.8 + n.semilla * 2))),
       topCerca: (i) => 458 - 60 * (0.4 * LP.hash(i, 3, n.semilla + 3) + 0.6 * (0.5 + 0.5 * Math.sin(i * 1.1 + n.semilla * 3))),
       tips: new Set(), datosVistos: new Set(), datosNuevos: 0, limpias: 0, plumasTomadas: 0, vistaT: 0,
-      seguras: carronas.filter((c) => !c.venenosa).length, tiempo: 0, llegadaT: 0, finT: 0, correcta: false, quizBonus: 0,
+      seguras: carronas.filter((c) => !c.venenosa).length, tiempo: 0, llegadaT: 0, finT: 1.5, correcta: false, quizBonus: 0,
     };
-    return mundo;
   }
 
   const ALT_Y = (y) => FISICA.altitudBase + (468 - y) * FISICA.altitudPorPixel;
 
-  /* ---------- Jugadores ---------- */
   function crearJugadores() {
     const p = Almacen.prefs, dos = p.jugadores === 2;
     const sexos = dos ? [p.sexo, p.sexo === "macho" ? "hembra" : "macho"] : [p.sexo];
@@ -128,13 +114,12 @@ const Juego = (() => {
         x: 260 - i * 70, y: 170 + i * 60, vx: N.vel, vy: 0, energia: c.energia, energiaMax: c.energia,
         vidas, vivo: vidas > 0, suelo: false, espera: 0, comiendo: null, noComer: 0, invul: 0, fase: 0, amp: 0, aleteoT: 0,
         vistaEspera: 0, vistaT: 0, glideT: 0, mult: 1, puntos: 0, aleteoSeg: 0, tiempo: 0, danos: 0, rot: 0,
-        mordisco: 0, dir: 1, dirV: 1, dirS: 1, pod: { escudo: 0, rafaga: 0, termica: 0, iman: 0 }, vuelo: 1, spreadV: 1, pasoFase: 0, pasoAmp: 0, aterrizajeT: 0, despegueT: 0, 
+        mordisco: 0, dir: 1, dirV: 1, dirS: 1, pod: { escudo: 0, rafaga: 0, termica: 0, iman: 0 }, vuelo: 1, spreadV: 1, pasoFase: 0, pasoAmp: 0, aterrizajeT: 0, despegueT: 0,
         causaMuerte: null, energiaAlerta: 0, modo: "planeando", avisoT: 0, avisoTxt: "", multPrev: 1, cv: null, llego: false, auto: false, enTermica: false, enTormenta: false, escala: c.escala,
       };
     });
   }
 
-  /* ---------- Entrada ---------- */
   const MAPAS = {
     uno: [{ izq: ["ArrowLeft", "KeyA"], der: ["ArrowRight", "KeyD"], aletear: ["ArrowUp", "KeyW", "Space"], picada: ["ArrowDown", "KeyS"], vista: ["KeyV", "KeyE"] }],
     dos: [
@@ -169,7 +154,6 @@ const Juego = (() => {
   window.addEventListener("blur", () => { teclas.clear(); if (estado === "jugando" || estado === "llegando") pausar(); });
   document.addEventListener("visibilitychange", () => { if (document.hidden && (estado === "jugando" || estado === "llegando")) pausar(); });
 
-  // controles táctiles
   document.querySelectorAll("#tactil [data-tecla]").forEach((b) => {
     const codigo = b.dataset.tecla;
     const soltar = () => { teclas.delete(codigo); b.classList.remove("pulsado"); };
@@ -182,7 +166,6 @@ const Juego = (() => {
     b.addEventListener("contextmenu", (e) => e.preventDefault());
   });
 
-  /* ---------- Utilidades de juego ---------- */
   function emitir(x, y, n, colores, o = {}) {
     for (let i = 0; i < n; i++) {
       const a = o.ang !== undefined ? o.ang + (Math.random() - 0.5) * (o.abre || 1) : Math.random() * TAU;
@@ -209,23 +192,18 @@ const Juego = (() => {
   const puntosTotales = () => (partida ? partida.puntos : 0) + jugadores.reduce((s, p) => s + p.puntos, 0);
 
   function morir(p, causa) {
-
     if (!p.vivo) return;
-
     if (p.comiendo) {
       p.comiendo.obj.estado = 0;
       p.comiendo.obj.por = null;
       p.comiendo = null;
     }
-
     p.vivo = false;
     p.vidas = 0;
     p.causaMuerte = causa;
     p.modo = "muerto";
-
     p.vy = p.suelo ? 0 : -80;
     p.vx *= 0.3;
-
     p.invul = 0;
     p.aleteoT = 0;
     p.amp = 0;
@@ -234,28 +212,21 @@ const Juego = (() => {
     p.mult = 1;
     p.auto = false;
     p.vistaT = 0;
-
-    for (const k in p.pod) {
-      p.pod[k] = 0;
-    }
+    for (const k in p.pod) p.pod[k] = 0;
 
     if (causa === "agotamiento") {
       p.energia = 0;
       SND.play("dano");
-      UI.consejo(`${p.nombre}: murio por agotamiento.`, 2500);
+      UI.consejo(`${p.nombre}: murió por agotamiento.`, 2500);
     } else {
-      UI.consejo(`${p.nombre}: perdio todas sus vidas.`, 2500);
+      UI.consejo(`${p.nombre}: perdió todas sus vidas.`, 2500);
     }
-
-    if (!vivos().length) {
-      M.finT = 1.5;
-    }
+    if (!vivos().length) M.finT = 1.5;
   }
 
-  /* ---------- Daño ---------- */
   function herir(p, causa) {
     if (!p.vivo || p.invul > 0) return;
-    if (p.pod.escudo > 0 && causa !== "veneno") {          // el escudo desvía todo menos el veneno
+    if (p.pod.escudo > 0 && causa !== "veneno") {
       p.invul = Math.max(p.invul, 0.35); SND.play("escudo"); sacudida = Math.max(sacudida, 3);
       emitir(p.x, p.y, 12, ["#8fdcff", "#c9f0ff", "#ffffff"], { vel: 150, g: 0, tam: 4, vida: 0.5 });
       UI.consejo("¡El escudo te protegió!", 1800); return;
@@ -270,17 +241,13 @@ const Juego = (() => {
     if (causa === "veneno") mostrarDato("veneno");
     if (causa === "caza") mostrarDato("caza");
     if (causa === "rayo") UI.consejo("Un rayo con aviso: cuando veas la línea, sal de ahí.");
-    if (p.vidas <= 0) {
-      morir(p, causa);
-    }
+    if (p.vidas <= 0) morir(p, causa);
   }
 
-  /* ---------- Vista de cóndor ---------- */
   function activarVista(p) {
     if (!p.vivo || p.comiendo) return;
     if (p.vistaEspera > 0 || p.energia < FISICA.vistaCoste) { if (p.vistaEspera <= 0) UI.consejo("Necesitas más energía para la Vista de cóndor."); return; }
     if (!consumirEnergia(p, FISICA.vistaCoste)) return;
-
     p.vistaEspera = FISICA.vistaEspera;
     p.vistaT = FISICA.vistaDuracion;
     M.vistaT = FISICA.vistaDuracion; partida.vistas++;
@@ -289,31 +256,16 @@ const Juego = (() => {
     mostrarDato("vista");
   }
 
-  /* ---------- Alas y aleteo ---------- */
   function aletear(p) {
     const F = FISICA, c = CONDORES[p.sexo];
     if (!p.vivo) return false;
-
     const desdeSuelo = p.suelo;
-
-    const coste = F.aleteoCoste * c.coste
-      * (desdeSuelo ? F.despegueMultiplicador : 1);
-
-    if (!consumirEnergia(p, coste)) {
-      return false;
-    }
+    const coste = F.aleteoCoste * c.coste * (desdeSuelo ? F.despegueMultiplicador : 1);
+    if (!consumirEnergia(p, coste)) return false;
     p.vy = -F.aleteoImpulso * (desdeSuelo ? 1.12 : 1) * (0.92 + 0.1 * c.agil);
     p.espera = F.aleteoEspera; p.aleteoT = 0.42; p.glideT = 0;
-
     if (desdeSuelo) {
-      p.suelo = false;
-      p.y -= 4;
-
-      p.despegueT = F.despegueTiempo;
-      p.aterrizajeT = 0;
-
-      p.pasoAmp = 0;
-      p.pasoFase = 0;
+      p.suelo = false; p.y -= 4; p.despegueT = F.despegueTiempo; p.aterrizajeT = 0; p.pasoAmp = 0; p.pasoFase = 0;
       emitir(p.x, p.y + 16, 8, ["#b69a6a", "#d2b98a"], { ang: -Math.PI / 2, abre: 2.4, vel: 70, tam: 3.5 });
       mostrarDato("despegue");
     } else emitir(p.x - 10, p.y + 8, 2, ["rgba(255,255,255,.7)"], { ang: Math.PI * 0.6, abre: 0.8, vel: 50, g: 0, tam: 3, vida: 0.4 });
@@ -321,7 +273,6 @@ const Juego = (() => {
     return true;
   }
 
-  /* ---------- Comer ---------- */
   function iniciarComer(p, c) {
     c.estado = 1; c.por = p; p.comiendo = { obj: c, prog: 0 };
     p.vx = 0; p.vy = 0; p.suelo = true; p.x = lerp(p.x, c.x, 0.7); p.y = M.suelo(p.x) - 18; p.mordisco = 0;
@@ -343,13 +294,12 @@ const Juego = (() => {
     p.comiendo.prog += dt / FISICA.comerTiempo;
     p.mordisco -= dt;
     if (p.mordisco <= 0) { p.mordisco = 0.28; SND.play("comer"); emitir(c.x, M.suelo(c.x) - 22, 4, ["#7a5532", "#a9825c", "#e6dcc9"], { vel: 70, g: 240, tam: 3, vida: 0.5, ang: -Math.PI / 2, abre: 1.6 }); }
-    if (e.aletear && p.espera <= 0 && p.energia > 0.5) {       // cancelar y despegar
+    if (e.aletear && p.espera <= 0 && p.energia > 0.5) {
       c.estado = 0; c.por = null; p.comiendo = null; p.noComer = 0.9; aletear(p); return;
     }
     if (p.comiendo.prog >= 1) terminarComer(p, c);
   }
 
-  /* ---------- Actualización de un jugador ---------- */
   function animarAlas(p, dt) {
     if (p.aleteoT > 0) { p.aleteoT -= dt; p.fase += dt * 17; p.amp = Math.min(1, p.amp + dt * 9); p.aleteoSeg += dt; }
     else p.amp = Math.max(0, p.amp - dt * 3.5);
@@ -362,66 +312,33 @@ const Juego = (() => {
   }
 
   function consumirEnergia(p, cantidad) {
-
     if (!p.vivo) return false;
-
     p.energia = Math.max(0, p.energia - cantidad);
-
-    if (p.energia <= 0) {
-      morir(p, "agotamiento");
-      return false;
-    }
-
+    if (p.energia <= 0) { morir(p, "agotamiento"); return false; }
     const porcentaje = p.energia / p.energiaMax;
-
     if (porcentaje <= FISICA.energiaCritica) {
-
-      if (p.energiaAlerta < 2) {
-        UI.consejo("Energia critica: busca alimento.", 3000);
-      }
-
+      if (p.energiaAlerta < 2) UI.consejo("Energía crítica: busca alimento.", 3000);
       p.energiaAlerta = 2;
-
     } else if (porcentaje <= FISICA.energiaBaja) {
-
-      if (p.energiaAlerta < 1) {
-        UI.consejo("Energia baja: evita aletear demasiado.", 3000);
-      }
-
+      if (p.energiaAlerta < 1) UI.consejo("Energía baja: evita aletear demasiado.", 3000);
       p.energiaAlerta = 1;
-
     } else {
       p.energiaAlerta = 0;
     }
-
     return true;
   }
 
   function actualizarJugador(p, dt) {
     const F = FISICA;
     if (!p.vivo) {
-
       const piso = M.suelo(p.x) - 8;
-
       if (p.y < piso && !p.suelo) {
-
-        p.vy += 520 * dt;
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-
+        p.vy += 520 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
         p.rot = Math.min(Math.PI / 2, p.rot + dt * 3);
-
       } else {
-
-        p.y = piso;
-        p.vx = 0;
-        p.vy = 0;
-        p.suelo = true;
-
-        p.rot += (Math.PI / 2 - p.rot)
-          * Math.min(1, dt * 8);
+        p.y = piso; p.vx = 0; p.vy = 0; p.suelo = true;
+        p.rot += (Math.PI / 2 - p.rot) * Math.min(1, dt * 8);
       }
-
       return;
     }
     if (p.auto) { autopiloto(p, dt); return; }
@@ -436,36 +353,25 @@ const Juego = (() => {
     animarAlas(p, dt);
 
     if (p.comiendo) {
-
       if (!consumirEnergia(p, F.energiaReposo * dt)) return;
-
       actualizarComer(p, e, dt);
-
-      if (p.vivo) {
-        actualizarPose(p, dt, e);
-      }
-
+      if (p.vivo) actualizarPose(p, dt, e);
       return;
     }
 
-    // horizontal: ← y → llevan al cóndor a cada lado (en el aire y caminando). Sin tocar nada, sigue hacia donde mira.
     if (e.izq && !e.der) p.dir = -1; else if (e.der && !e.izq) p.dir = 1;
     const dir = p.dir;
     let vel = N.vel;
     if (e.der) vel = F.velMax; else if (e.izq) vel = F.velMax * 0.85;
-    else if (p.enTermica) vel = N.vel * 0.5;               // dentro de una térmica giras más despacio
+    else if (p.enTermica) vel = N.vel * 0.5;
     let vxObj = dir * vel;
     if (e.picada && !p.suelo) vxObj += 40 * dir;
-    if (p.pod.rafaga > 0 && !p.suelo) vxObj += F.rafagaVel * dir;      // poder: viento a favor
-    if (p.suelo) {
-      vxObj = (Number(e.der) - Number(e.izq)) * F.caminataVel;
-    }
+    if (p.pod.rafaga > 0 && !p.suelo) vxObj += F.rafagaVel * dir;
+    if (p.suelo) vxObj = (Number(e.der) - Number(e.izq)) * F.caminataVel;
     p.dirV += (dir - p.dirV) * Math.min(1, dt * 9); p.dirS += (dir - p.dirS) * Math.min(1, dt * 3);
-    const acc = (p.suelo ? F.caminataAcel : F.aceleracion)
-      * c.agil * dt;
+    const acc = (p.suelo ? F.caminataAcel : F.aceleracion) * c.agil * dt;
     p.vx += clamp(vxObj - p.vx, -acc, acc);
 
-    // térmicas: el aire mismo sube. Dentro de una, planear te eleva sin gastar energía.
     let aire = 0; p.enTermica = false;
     for (const th of M.termicas) {
       const dx = Math.abs(p.x - th.x);
@@ -474,24 +380,18 @@ const Juego = (() => {
         aire = Math.min(aire, -F.termicaVel * (0.35 + 0.65 * f)); p.enTermica = true;
       }
     }
-    if (p.pod.termica > 0) aire = Math.min(aire, -F.termicaVel * 0.95);      // poder: térmica portátil
-    if (p.suelo) {
-      p.enTermica = false;
-    }
-    // vertical
+    if (p.pod.termica > 0) aire = Math.min(aire, -F.termicaVel * 0.95);
+    if (p.suelo) p.enTermica = false;
+
     if (!p.suelo) {
       if (e.picada) p.vy = Math.min(F.picadaVel, p.vy + F.picadaAcel * dt);
       else p.vy += (F.gravedad - (F.gravedad / (F.hundimiento * (p.pod.rafaga > 0 ? F.rafagaHund : 1))) * (p.vy - aire)) * dt;
-      const consumo = p.enTermica || p.pod.termica > 0
-        ? F.energiaTermica
-        : F.energiaPasiva;
-
+      const consumo = p.enTermica || p.pod.termica > 0 ? F.energiaTermica : F.energiaPasiva;
       if (!consumirEnergia(p, consumo * dt)) return;
     }
 
     if (e.aletear && p.espera <= 0) {
       aletear(p);
-
       if (!p.vivo) return;
     }
 
@@ -501,7 +401,6 @@ const Juego = (() => {
       if (p.termicaT > 1.6) mostrarDato("vuelo");
     }
 
-    // tormentas
     p.enTormenta = false;
     for (const s of M.tormentas) {
       if (Math.abs(p.x - s.x) < s.w / 2) {
@@ -512,47 +411,27 @@ const Juego = (() => {
       }
     }
 
-    // integrar
     p.x += p.vx * dt; p.y += p.vy * dt;
     if (p.y < 30) { p.y = 30; if (p.vy < 0) p.vy = 0; }
     p.x = clamp(p.x, 20, M.L + 300);
 
-    // suelo
     const piso = M.suelo(p.x) - 18;
     if (p.suelo) { p.y = piso; p.vy = 0; }
     else if (p.y >= piso && p.vy >= 0) {
       if (p.vy > 260) {
-
         if (!consumirEnergia(p, 4)) return;
-
-        emitir(
-          p.x,
-          p.y + 16,
-          8,
-          ["#b69a6a", "#d2b98a"],
-          { vel: 90, tam: 3.5 }
-        );
+        emitir(p.x, p.y + 16, 8, ["#b69a6a", "#d2b98a"], { vel: 90, tam: 3.5 });
       }
-      p.y = piso;
-      p.vy = 0;
-      p.suelo = true;
-      p.vx *= 0.4;
-
-      p.aterrizajeT = F.aterrizajeTiempo;
-      p.despegueT = 0;
-      p.aleteoT = 0;
-      p.amp = 0;
+      p.y = piso; p.vy = 0; p.suelo = true; p.vx *= 0.4;
+      p.aterrizajeT = F.aterrizajeTiempo; p.despegueT = 0; p.aleteoT = 0; p.amp = 0;
     }
 
-    // planeo: puntos extra mientras no aleteas
-    if (!p.suelo && p.aleteoT <= 0 && !e.aletear) {
-      p.glideT += dt;
-    } else if (e.aletear || p.suelo) {
-      p.glideT = 0;
-    }
+    if (!p.suelo && p.aleteoT <= 0 && !e.aletear) p.glideT += dt;
+    else if (e.aletear || p.suelo) p.glideT = 0;
     p.mult = 1 + Math.min(4, Math.floor(p.glideT / 2.5));
     if (p.mult > p.multPrev) { p.avisoT = 1.3; p.avisoTxt = "Planeo ×" + p.mult; }
     p.multPrev = p.mult;
+
     peligros(p);
     if (!p.vivo) return;
     recoger(p, dt);
@@ -562,7 +441,6 @@ const Juego = (() => {
   }
 
   function peligros(p) {
-    // cables
     for (const c of M.cables) {
       if (p.x > c.x0 - 14 && p.x < c.x1 + 14) {
         if (p.x > c.x0 && p.x < c.x1) {
@@ -575,11 +453,9 @@ const Juego = (() => {
       }
     }
     if (!p.vivo) return;
-    // carroña
     for (const c of M.carronas) {
       if (c.estado === 0 && !c.por && !p.comiendo && p.noComer <= 0 && Math.abs(p.x - c.x) < 52 && p.y > M.suelo(c.x) - 72) { iniciarComer(p, c); break; }
     }
-    // llegada al nido
     if (!p.llego && p.x > M.nido.x - 90 && Math.abs(p.y - M.nido.y) < 80) llegar(p);
   }
 
@@ -589,7 +465,7 @@ const Juego = (() => {
       const dx = q.x - p.x, dy = q.y - p.y;
       if (dx * dx + dy * dy < 38 * 38) { q.tomado = true; activarPoder(p, q); }
     }
-    if (p.pod.iman > 0) {        // poder: las plumas vuelan hacia ti
+    if (p.pod.iman > 0) {
       const R = FISICA.imanRadio;
       for (const f of M.plumas) {
         if (f.tomada) continue;
@@ -617,89 +493,46 @@ const Juego = (() => {
     UI.consejo(`${def.nombre}: ${def.corto}`, 3600);
   }
 
-  /* Modo de vuelo: decide cómo se ven las alas y qué muestra el HUD.
-     Aleteando = alas en movimiento. Planeando = alas abiertas y quietas. */
   function actualizarPose(p, dt, e) {
     let modo;
-
     const distanciaSuelo = M.suelo(p.x) - 18 - p.y;
+    const preparandoAterrizaje = !p.suelo && !e.aletear && !e.picada && p.vy > 0 && p.vy <= FISICA.aterrizajeVelocidad && distanciaSuelo >= 0 && distanciaSuelo <= FISICA.aterrizajeDistancia;
 
-    const preparandoAterrizaje =
-      !p.suelo &&
-      !e.aletear &&
-      !e.picada &&
-      p.vy > 0 &&
-      p.vy <= FISICA.aterrizajeVelocidad &&
-      distanciaSuelo >= 0 &&
-      distanciaSuelo <= FISICA.aterrizajeDistancia;
-    
-    if (p.comiendo) {
-      modo = "comiendo";
-    } else if (p.despegueT > 0 && !p.suelo) {
-      modo = "despegando";
-    } else if (p.aterrizajeT > 0 || preparandoAterrizaje) {
-      modo = "aterrizando";
-    } else if (p.suelo) {
-      modo = Math.abs(p.vx) > 3 ? "caminando" : "suelo";
-    } else if (e.picada) {
-      modo = "picada";
-    } else if (p.aleteoT > 0) {
-      modo = "aleteando";
-    } else if (p.enTermica || p.pod.termica > 0) {
-      modo = "termica";
-    } else {
-      modo = "planeando";
-    }
+    if (p.comiendo) modo = "comiendo";
+    else if (p.despegueT > 0 && !p.suelo) modo = "despegando";
+    else if (p.aterrizajeT > 0 || preparandoAterrizaje) modo = "aterrizando";
+    else if (p.suelo) modo = Math.abs(p.vx) > 3 ? "caminando" : "suelo";
+    else if (e.picada) modo = "picada";
+    else if (p.aleteoT > 0) modo = "aleteando";
+    else if (p.enTermica || p.pod.termica > 0) modo = "termica";
+    else modo = "planeando";
+
     if (modo !== p.modo) {
-      if (modo === "aleteando" || modo === "planeando" || modo === "termica" || modo === "picada" || modo === "aterrizando" || modo === "despegando") {p.avisoT = 1.3; p.avisoTxt = MODOS[modo].texto;}
+      if (["aleteando", "planeando", "termica", "picada", "aterrizando", "despegando"].includes(modo)) { p.avisoT = 1.3; p.avisoTxt = MODOS[modo].texto; }
       if (modo === "aleteando") tip("mAle", "Aleteando: las alas se mueven y gastas energía. Suelta ↑ para planear gratis.");
       if (modo === "planeando" && p.modo === "aleteando") tip("mPla", "Planeando: alas abiertas y quietas. ¡Es gratis y suma combo de puntos!");
       p.modo = modo;
     }
+
     const enAire = !p.suelo && modo !== "comiendo";
-
-    const intensidad = modo === "caminando"
-      ? clamp(Math.abs(p.vx) / FISICA.caminataVel, 0, 1)
-      : 0;
-
-    p.pasoAmp += (intensidad - p.pasoAmp)
-      * Math.min(1, dt * 12);
-
+    const intensidad = modo === "caminando" ? clamp(Math.abs(p.vx) / FISICA.caminataVel, 0, 1) : 0;
+    p.pasoAmp += (intensidad - p.pasoAmp) * Math.min(1, dt * 12);
     if (intensidad > 0) {
-      p.pasoFase += dt * Math.PI
-        * FISICA.caminataPasos * intensidad;
-
+      p.pasoFase += dt * Math.PI * FISICA.caminataPasos * intensidad;
       p.pasoFase %= TAU;
     }
+    if (enAire || p.comiendo) p.pasoAmp = 0;
 
-    if (enAire || p.comiendo) {
-      p.pasoAmp = 0;
-    }
     let vueloObjetivo = enAire ? 1 : 0;
     let alasObjetivo = enAire ? 1 : 0;
+    if (modo === "picada") alasObjetivo = 0.12;
+    if (modo === "aterrizando") { vueloObjetivo = p.suelo ? 0 : 0.35; alasObjetivo = p.suelo ? 0 : 0.65; }
+    if (modo === "despegando") { vueloObjetivo = 1; alasObjetivo = 1; }
 
-    if (modo === "picada") {
-      alasObjetivo = 0.12;
-    }
-
-    if (modo === "aterrizando") {
-      vueloObjetivo = p.suelo ? 0 : 0.35;
-      alasObjetivo = p.suelo ? 0 : 0.65;
-    }
-
-    if (modo === "despegando") {
-      vueloObjetivo = 1;
-      alasObjetivo = 1;
-    }
-
-    p.vuelo += (vueloObjetivo - p.vuelo)
-      * Math.min(1, dt * 7);
-
-    p.spreadV += (alasObjetivo - p.spreadV)
-      * Math.min(1, dt * 8);
+    p.vuelo += (vueloObjetivo - p.vuelo) * Math.min(1, dt * 7);
+    p.spreadV += (alasObjetivo - p.spreadV) * Math.min(1, dt * 8);
   }
 
-  /* ---------- Llegada al nido ---------- */
   function llegar(p) {
     p.llego = true; p.auto = true; p.invul = 99;
     if (estado === "jugando") {
@@ -716,42 +549,12 @@ const Juego = (() => {
     if (!faltan || M.llegadaT > 3.8) { if (M.llegadaT > 2.2) finalizarNivel(); }
   }
 
-  /* ---------- Puntos de control ---------- */
-  function revivir(p, c, vidas) {
-    p.vivo = true; p.vidas = vidas; p.x = c.x - 30 * p.id; p.y = Math.min(210, M.suelo(c.x) - 120); p.vx = N.vel; p.vy = 0;
-    p.suelo = false; p.comiendo = null; p.invul = 2.5; p.energia = Math.max(p.energia, p.energiaMax * 0.6); p.auto = false; p.llego = false;
-    p.dir = 1; p.dirV = 1; p.dirS = 1; p.rot = 0; p.vuelo = 1; p.spreadV = 1; p.glideT = 0;
-    p.pasoFase = 0;
-    p.pasoAmp = 0;
-    p.aterrizajeT = 0;
-    p.despegueT = 0;
-    for (const k in p.pod) p.pod[k] = 0;
-  }
   function activarControl(c) {
-
-    c.activo = true;
-    M.control = c;
-
-    SND.play("control");
-
-    emitir(
-      c.x,
-      M.suelo(c.x) - 90,
-      22,
-      ["#ffe08a", "#ffffff", "#ffcf55"],
-      { vel: 210, g: 60, tam: 5, vida: 1 }
-    );
-
-    vivos().forEach((p) => {
-      p.energia = Math.min(p.energiaMax, p.energia + 25);
-    });
-
+    c.activo = true; M.control = c; SND.play("control");
+    emitir(c.x, M.suelo(c.x) - 90, 22, ["#ffe08a", "#ffffff", "#ffcf55"], { vel: 210, g: 60, tam: 5, vida: 1 });
+    vivos().forEach((p) => { p.energia = Math.min(p.energiaMax, p.energia + 25); });
     const n = M.controles.filter((q) => q.activo).length;
-
-    UI.consejo(
-      `Punto de control ${n} de ${M.controles.length}: +25 de energia.`,
-      3800
-    );
+    UI.consejo(`Punto de control ${n} de ${M.controles.length}: +25 de energía.`, 3800);
   }
   function actualizarControles(dt) {
     for (const c of M.controles) {
@@ -761,20 +564,16 @@ const Juego = (() => {
     }
   }
   function perderTodo() {
-
     if (estado !== "jugando" && estado !== "llegando") return;
-
     if (vivos().length) return;
-
     terminarPartida(false);
   }
 
-  /* ---------- Entidades ---------- */
   function actualizarCarronas(dt) {
     for (const c of M.carronas) {
       if (c.estado === 2 && c.comida < 1) c.comida = Math.min(1, c.comida + dt * 2.5);
       if (c.estado === 0 && cam < c.x && c.x < cam + W - 80) {
-        if (!c.venenosa && N.id >= 1) { tip("gallinazos", "Los gallinazos dan vueltas sobre la comida segura. Baja en picada con ↓ para comer."); }
+        if (!c.venenosa && N.id >= 1) tip("gallinazos", "Los gallinazos dan vueltas sobre la comida segura. Baja en picada con ↓ para comer.");
       }
     }
   }
@@ -820,42 +619,31 @@ const Juego = (() => {
     }
   }
 
-  /* ---------- Bucle principal ---------- */
   function actualizar(dt) {
     M.tiempo += dt;
     jugadores.forEach((p) => actualizarJugador(p, dt));
-    // en pareja, los dos se quedan en pantalla
     if (jugadores.length === 2) vivos().forEach((p) => { if (!p.auto) p.x = clamp(p.x, cam + 34, cam + W - 60); });
     actualizarCarronas(dt); actualizarCazadores(dt); actualizarTormentas(dt); actualizarControles(dt);
     M.vistaT = Math.max(0, M.vistaT - dt);
 
-    // cámara: sigue al promedio de los cóndores vivos
     const v = vivos().length ? vivos() : jugadores;
     const mx = v.reduce((s, p) => s + p.x, 0) / v.length, mvx = v.reduce((s, p) => s + p.vx, 0) / v.length;
     const dS = v.reduce((s2, p) => s2 + p.dirS, 0) / v.length;
-    const objetivo = clamp(mx - (480 - dS * 170 + dS * (Math.abs(mvx) - N.vel) * 0.35), 0, M.L - 640);   // deja espacio hacia donde vas
+    const objetivo = clamp(mx - (480 - dS * 170 + dS * (Math.abs(mvx) - N.vel) * 0.35), 0, M.L - 640);
     cam += (objetivo - cam) * Math.min(1, dt * 5);
 
-    // partículas
     for (let i = M.part.length - 1; i >= 0; i--) {
       const q = M.part[i]; q.vida -= dt; q.vy += q.g * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.vr * dt;
       if (q.vida <= 0) M.part.splice(i, 1);
     }
     sacudida = Math.max(0, sacudida - dt * 30); destello = Math.max(0, destello - dt * 2.2);
 
-    // sonido de viento según velocidad
     const vm = v.reduce((s, p) => s + Math.hypot(p.vx, p.vy), 0) / v.length;
     SND.viento(clamp(vm / 340, 0, 1));
 
     if (!vivos().length) {
-
       M.finT -= dt;
-
-      if (M.finT <= 0) {
-        perderTodo();
-        return;
-      }
-
+      if (M.finT <= 0) { perderTodo(); return; }
     } else if (estado === "llegando") {
       actualizarLlegada(dt);
     }
@@ -880,7 +668,6 @@ const Juego = (() => {
     };
   }
 
-  /* ---------- Fin de nivel y de partida ---------- */
   function finalizarNivel() {
     if (estado !== "llegando") return;
     estado = "pregunta"; teclas.clear(); SND.viento(0.1);
@@ -890,9 +677,7 @@ const Juego = (() => {
     let bonus = 0;
     vivos().forEach((p) => { bonus += Math.round(p.energia * 2 + p.vidas * 100); });
     M.resultado = { pct, aleteoPct, danos, bonus };
-    partida.vidasIni = jugadores.map((p) =>
-      p.vivo ? Math.min(FISICA.vidas, p.vidas + 1) : 0
-    );
+    partida.vidasIni = jugadores.map((p) => p.vivo ? Math.min(FISICA.vidas, p.vidas + 1) : 0);
     if (aleteoPct < 12) otorgar("planeador");
     if (pct === 100 && M.seguras > 0) otorgar("limpiador");
     if (danos === 0) otorgar("intocable");
@@ -931,10 +716,9 @@ const Juego = (() => {
       limpio: limpios.length ? Math.round(limpios.reduce((s, x) => s + x, 0) / limpios.length) : (M.seguras ? Math.round((M.limpias / M.seguras) * 100) : 0) });
   }
 
-  /* ---------- Control de flujo (lo llama la interfaz) ---------- */
   function cargarNivel(i) {
     nivelIdx = i; N = NIVELES[i]; M = crearMundo(i); cam = 0; jugadores = []; sacudida = 0; destello = 0;
-    const c = parseInt(N.cielo[2].slice(1), 16);          // color de la neblina = color del horizonte
+    const c = parseInt(N.cielo[2].slice(1), 16);
     M.nebRGB = `${c >> 16},${(c >> 8) & 255},${c & 255}`;
   }
   function nuevaPartida() {
@@ -962,7 +746,6 @@ const Juego = (() => {
   function reanudar() { if (estado !== "pausa") return; UI.ocultar(); estado = M.pausadoEnLlegada ? "llegando" : "jugando"; ultimo = performance.now(); if (!vivos().length) perderTodo(); }
   function alMenu() { estado = "menu"; teclas.clear(); SND.viento(0); SND.musica(false); UI.hudVisible(false); UI.limpiarAvisos(); cargarNivel(0); UI.menu(); }
 
-  /* ---------- Dibujo ---------- */
   function neblina(a) {
     const g = ctx.createLinearGradient(0, 240, 0, 520);
     g.addColorStop(0, `rgba(${M.nebRGB},0)`); g.addColorStop(1, `rgba(${M.nebRGB},${a * 1.8})`);
@@ -984,28 +767,27 @@ const Juego = (() => {
       LP.nube(ctx, sx, c.y, c.s, c.sem, color, N.clima === "tormenta" ? 0.9 : 0.85);
     }
   }
-  /* El mismo cóndor 3D del visor, pintado en un lienzo propio y pegado en el juego. */
+
   const SPW = 360, SPH = 300;
   function trazarCondor(h, x, y, o) {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     if (!h.cv) { h.cv = document.createElement("canvas"); h.cv.width = SPW * dpr; h.cv.height = SPH * dpr; h.c2 = h.cv.getContext("2d"); }
     const c2 = h.c2, v = o.vuelo;
     c2.setTransform(dpr, 0, 0, dpr, 0, 0); c2.clearRect(0, 0, SPW, SPH);
-    Condor3D.sprite(c2, { pasoFase: o.pasoFase, pasoAmp: o.pasoAmp, macho: o.macho, spread: o.spread, psi: o.psi, rx: v * 0.9, yaw: lerp(-1.5, -2.3, v), pitch: lerp(0.12, 0.75, v),
-      dist: 6, f: 432, cx: SPW / 2, cy: SPH / 2, t: o.t, nod: o.nod, look: o.look, tilt: o.tilt });
+    Condor3D.sprite(c2, {
+      pasoFase: o.pasoFase, pasoAmp: o.pasoAmp, macho: o.macho, accesorio: o.accesorio,
+      spread: o.spread, psi: o.psi, rx: v * 0.9, yaw: lerp(-1.5, -2.3, v), pitch: lerp(0.12, 0.75, v),
+      dist: 6, f: 432, cx: SPW / 2, cy: SPH / 2, t: o.t, nod: o.nod, look: o.look, tilt: o.tilt,
+    });
     ctx.save();
-    const balanceo = (o.pasoAmp || 0)
-      * (1 - Math.cos(2 * (o.pasoFase || 0)))
-      * 1.5;
-
-    const altura = (1 - v)
-      * (0.85 * 72 * (o.macho ? 1 : 0.9) - 18);
-
+    const balanceo = (o.pasoAmp || 0) * (1 - Math.cos(2 * (o.pasoFase || 0))) * 1.5;
+    const altura = (1 - v) * (0.85 * 72 * (o.macho ? 1 : 0.9) - 18);
     ctx.translate(x, y - altura - balanceo);
     ctx.scale(o.dir === undefined ? 1 : o.dir, 1); ctx.rotate(o.ang || 0);
     ctx.globalAlpha = o.alpha === undefined ? 1 : o.alpha; ctx.drawImage(h.cv, -SPW / 2, -SPH / 2, SPW, SPH); ctx.restore();
   }
-  function estelaPlaneo(x, y, p, T) {       // líneas de viento: solo aparecen al planear
+
+  function estelaPlaneo(x, y, p, T) {
     const dorado = p.mult > 1, len = 46 + Math.min(90, p.glideT * 16), a = 0.3 + Math.min(0.4, p.glideT * 0.05), col = dorado ? "255,224,138" : "205,240,255";
     ctx.save(); ctx.lineCap = "round"; ctx.lineWidth = 3;
     [[-34, 1], [-8, 1.35], [20, 1.1], [46, 0.8]].forEach(([dy, k]) => {
@@ -1016,12 +798,8 @@ const Juego = (() => {
     ctx.restore();
   }
   const COLOR_MODO = {
-    aleteando: "#ffb06a",
-    planeando: "#9fe3ff",
-    termica: "#ffd46e",
-    picada: "#ff8a7a",
-    aterrizando: "#a8e6a3",
-    despegando: "#ffe08a"
+    aleteando: "#ffb06a", planeando: "#9fe3ff", termica: "#ffd46e",
+    picada: "#ff8a7a", aterrizando: "#a8e6a3", despegando: "#ffe08a",
   };
   function dibujarJugador(p, T) {
     const x = p.x - cam, y = p.y;
@@ -1029,21 +807,21 @@ const Juego = (() => {
     if (!p.vivo) alpha = 0.85; else if (p.invul > 0 && p.invul < 90 && Math.floor(T * 14) % 2 && p.pod.escudo <= 0) alpha = 0.35;
     if (jugadores.length === 2 && p.vivo) LP.tri(ctx, x - 7, y - 74, x + 7, y - 74, x, y - 62, p.id === 0 ? "#ffcf55" : "#6fd3ff");
     if (p.vivo && (p.modo === "planeando" || p.modo === "termica") && p.vuelo > 0.6) estelaPlaneo(x, y, p, T);
-    const flap = p.suelo
-      ? 0
-      : p.aleteoT > 0
-        ? 0.8 * p.amp * Math.sin(p.fase)
-        : 0.05 * Math.sin(T * 1.6) * p.spreadV;
+    const flap = p.suelo ? 0 : p.aleteoT > 0 ? 0.8 * p.amp * Math.sin(p.fase) : 0.05 * Math.sin(T * 1.6) * p.spreadV;
     const nod = p.comiendo ? 0.95 + 0.12 * Math.sin(T * 14) : p.modo === "picada" ? 0.12 : -0.05 + 0.04 * Math.sin(T * 1.7);
-    trazarCondor(p, x, y, { pasoFase: p.pasoFase, pasoAmp: p.vivo && p.suelo ? p.pasoAmp : 0, macho: p.macho, vuelo: p.vivo ? p.vuelo : 1, spread: p.vivo ? p.spreadV : 0.35, psi: p.vivo ? flap : 0,
+    trazarCondor(p, x, y, {
+      pasoFase: p.pasoFase, pasoAmp: p.vivo && p.suelo ? p.pasoAmp : 0, macho: p.macho,
+      accesorio: (Almacen.prefs && Almacen.prefs.accesorio) || "ninguno",
+      vuelo: p.vivo ? p.vuelo : 1, spread: p.vivo ? p.spreadV : 0.35, psi: p.vivo ? flap : 0,
       dir: p.vivo ? p.dirV : 1, nod: p.vivo ? nod : 0, look: 0.05 * Math.sin(T * 0.8), tilt: 0.04 * Math.sin(T * 1.3), t: T, alpha,
-      ang: p.vivo ? clamp(p.vy * 0.0016, -0.3, 0.45) * p.vuelo : p.rot });
-    if (p.vivo && p.pod.iman > 0) {   // anillo del imán de plumas
+      ang: p.vivo ? clamp(p.vy * 0.0016, -0.3, 0.45) * p.vuelo : p.rot,
+    });
+    if (p.vivo && p.pod.iman > 0) {
       ctx.save(); ctx.strokeStyle = "rgba(95,224,200,.55)"; ctx.lineWidth = 2.5; ctx.setLineDash([10, 9]); ctx.lineDashOffset = -T * 40;
       ctx.beginPath(); ctx.arc(x, y, FISICA.imanRadio * (0.92 + 0.04 * Math.sin(T * 5)), 0, TAU); ctx.stroke(); ctx.restore();
     }
     if (p.vivo && p.pod.escudo > 0) LP.escudo(ctx, x, y, T, p.pod.escudo < 2 ? 0.4 + 0.6 * Math.abs(Math.sin(T * 12)) : 1);
-    if (p.comiendo) {   // anillo de progreso al comer
+    if (p.comiendo) {
       ctx.strokeStyle = "rgba(255,240,190,.95)"; ctx.lineWidth = 4; ctx.beginPath();
       ctx.arc(x, y - 56, 13, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(p.comiendo.prog, 0, 1)); ctx.stroke();
       ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y - 56, 15.5, 0, TAU); ctx.stroke();
@@ -1054,7 +832,7 @@ const Juego = (() => {
       ctx.beginPath(); for (let k = 0; k < 6; k++) { const a = (k / 6) * TAU + T, r = 30 + f * 90; ctx[k ? "lineTo" : "moveTo"](x + Math.cos(a) * r, y + Math.sin(a) * r); }
       ctx.closePath(); ctx.stroke(); ctx.restore();
     }
-    if (p.vivo && p.avisoT > 0) {   // etiqueta flotante: aleteando / planeando / combo
+    if (p.vivo && p.avisoT > 0) {
       const a = Math.min(1, p.avisoT * 2.2), txt = p.avisoTxt;
       ctx.save(); ctx.globalAlpha = a; ctx.font = "700 16px 'Chakra Petch', system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.lineJoin = "round"; ctx.lineWidth = 5; ctx.strokeStyle = "rgba(10,14,32,.85)"; ctx.fillStyle = txt.startsWith("Planeo") ? "#ffe08a" : COLOR_MODO[p.modo] || "#fff";
@@ -1082,7 +860,6 @@ const Juego = (() => {
     LP.terreno(ctx, { cam, par: 0.52, cw: 72, top: M.topCerca, bottom: H, hsl: pal.cerca, semilla: n.semilla + 3, filas: 2 });
     LP.terreno(ctx, { cam, par: 1, cw: 56, top: M.altura, bottom: H + 40, hsl: pal.suelo, semilla: n.semilla + 4, filas: 3, mezcla: M.mezclaSuelo });
 
-    // vegetación del páramo
     const i0 = Math.floor(cam / 56) - 2;
     for (let i = i0; i < i0 + 23; i++) {
       const x = i * 56 - cam, y = M.altura(i), h = LP.hash(i, 77, n.semilla);
@@ -1091,26 +868,20 @@ const Juego = (() => {
       else if (h > 0.55) LP.roca(ctx, x, y + 2, 1 + h, [pal.suelo[0], 10, 40]);
     }
 
-    // banderas de punto de control
     for (const c of M.controles) { const sx = c.x - cam; if (sx > -80 && sx < W + 80) LP.bandera(ctx, sx, M.suelo(c.x) + 2, c.activo, T, c.anim); }
-    // térmicas
     for (const t of M.termicas) { const sx = t.x - cam; if (sx > -200 && sx < W + 200) LP.termica(ctx, sx, t.w, M.suelo(t.x), T, n.clima === "tormenta" ? 0.8 : 1); }
-    // tormentas (nube + corriente descendente)
     for (const s of M.tormentas) dibujarTormenta(s, T);
-    // nido
     LP.nido(ctx, M.nido.x - cam, M.nido.y + 6, nivelIdx >= 3, T);
-    // torres y cables
     for (const c of M.cables) {
       const a = c.x0 - cam, b = c.x1 - cam; if (b < -50 || a > W + 50) continue;
       LP.torre(ctx, a, M.suelo(c.x0) + 4, c.y0 - 8); LP.torre(ctx, b, M.suelo(c.x1) + 4, c.y0 - 8);
       c.lineas.forEach((off) => LP.cable(ctx, a, b, c.y0 + off, c.hund, T));
     }
-    // carroña, gallinazos y marcadores de la vista
     const vista = M.vistaT > 0;
     for (const c of M.carronas) {
       const sx = c.x - cam; if (sx < -120 || sx > W + 120) continue;
       LP.carrona(ctx, sx, M.suelo(c.x) + 3, 1, c.estado === 2 ? c.comida : 0, c.venenosa);
-      if (c.venenosa && c.estado !== 2) {        // vapor morado: se nota de lejos que es veneno
+      if (c.venenosa && c.estado !== 2) {
         for (let k = 0; k < 3; k++) {
           const ph = (T * 0.45 + k / 3 + c.x * 0.01) % 1;
           ctx.globalAlpha = (1 - ph) * 0.6;
@@ -1126,7 +897,6 @@ const Juego = (() => {
         if (vista) LP.marcador(ctx, sx, M.suelo(c.x) - 70, c.venenosa, T);
       }
     }
-    // cazadores
     for (const c of M.cazadores) {
       const sx = c.x - cam; if (sx < -80 || sx > W + 80) continue;
       const gy = M.suelo(c.x), apunta = c.estado === "apunta" || (c.estado === "recarga" && c.t < 0.4);
@@ -1134,27 +904,22 @@ const Juego = (() => {
       LP.cazador(ctx, sx, gy + 2, apunta, ang, T);
       if (c.estado === "apunta" && c.obj) dibujarMira(c, gy, T);
     }
-    // plumas
     for (const f of M.plumas) { const sx = f.x - cam; if (!f.tomada && sx > -30 && sx < W + 30) LP.pluma(ctx, sx, f.y, T, f.fase); }
-    // poderes
     for (const q of M.poderes) { const sx = q.x - cam; if (!q.tomado && sx > -60 && sx < W + 60) LP.poder(ctx, sx, q.y, q.tipo, PODERES[q.tipo].color, T, q.fase); }
-    // cóndores
     jugadores.forEach((p) => dibujarJugador(p, T));
-    // demo en menú
     if (!sc && jugadores.length === 0) {
       const hz = Math.sin(T * 0.7), mac = Almacen.prefs.sexo === "macho";
-      trazarCondor(demo, 330, 250 + hz * 36, { macho: mac, vuelo: 1, spread: 1, psi: demo.amp > 0.05 ? 0.8 * demo.amp * Math.sin(demo.fase) : 0.05 * Math.sin(T * 1.6),
-        nod: -0.05, look: 0.05, tilt: 0.04 * Math.sin(T), t: T, ang: Math.cos(T * 0.7) * 0.1 });
+      trazarCondor(demo, 330, 250 + hz * 36, {
+        macho: mac, accesorio: (Almacen.prefs && Almacen.prefs.accesorio) || "ninguno",
+        vuelo: 1, spread: 1, psi: demo.amp > 0.05 ? 0.8 * demo.amp * Math.sin(demo.fase) : 0.05 * Math.sin(T * 1.6),
+        nod: -0.05, look: 0.05, tilt: 0.04 * Math.sin(T), t: T, ang: Math.cos(T * 0.7) * 0.1,
+      });
     }
-    // partículas
     for (const q of M.part) LP.particula(ctx, { ...q, x: q.x - cam });
-    // lluvia y rayos delante
     for (const s of M.tormentas) dibujarRayos(s, T);
 
-    // vista de cóndor: tinte
     if (vista) { ctx.fillStyle = `rgba(40,50,110,${0.16 * clamp(M.vistaT, 0, 1)})`; ctx.fillRect(0, 0, W, H); }
     if (destello > 0) { ctx.fillStyle = `rgba(${destelloColor},${Math.min(0.7, destello)})`; ctx.fillRect(0, 0, W, H); }
-    // viñeta de peligro: energía baja
     const j0 = jugadores[0];
     if (sc && j0 && j0.vivo && j0.energia / j0.energiaMax < 0.2 && Math.floor(T * 3) % 2) {
       const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, H * 0.95);
@@ -1171,7 +936,7 @@ const Juego = (() => {
     ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
     ctx.strokeStyle = c.fijo ? "#ff4a3d" : "#ffb35c"; ctx.lineWidth = c.fijo ? 3 : 2;
     ctx.setLineDash(c.fijo ? [] : [9, 9]); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.setLineDash([]);
-    if (c.fijo) {   // marca de objetivo fijado: hexágono
+    if (c.fijo) {
       ctx.lineWidth = 3; ctx.beginPath();
       for (let k = 0; k < 6; k++) { const a = (k / 6) * TAU + T * 2, r = 30 + Math.sin(T * 20) * 3; ctx[k ? "lineTo" : "moveTo"](x1 + Math.cos(a) * r, y1 + Math.sin(a) * r); }
       ctx.closePath(); ctx.stroke();
@@ -1180,7 +945,6 @@ const Juego = (() => {
   }
   function dibujarTormenta(s, T) {
     const sx = s.x - cam; if (sx + s.w / 2 < -100 || sx - s.w / 2 > W + 100) return;
-    // corriente descendente
     ctx.save();
     for (let k = 0; k < 7; k++) {
       const xx = sx - s.w / 2 + 60 + ((k * 83 + s.semilla * 13) % (s.w - 120)), yy = 140 + ((T * 90 + k * 71) % 200);
@@ -1191,7 +955,6 @@ const Juego = (() => {
   }
   function dibujarRayos(s, T) {
     const sx = s.x - cam; if (sx + s.w / 2 < -100 || sx - s.w / 2 > W + 100) return;
-    // lluvia
     ctx.strokeStyle = "rgba(190,210,235,.35)"; ctx.lineWidth = 1.5; ctx.beginPath();
     for (let k = 0; k < 34; k++) {
       const xx = sx - s.w / 2 + ((k * 97 + s.semilla * 31) % s.w), yy = 130 + ((T * 520 + k * 53) % 330);
@@ -1207,13 +970,12 @@ const Juego = (() => {
     } else if (r.estado === 2) LP.rayo(ctx, x, s.y + 30, gy, Math.floor(T * 30), 1);
   }
 
-  /* ---------- Demo de fondo (menú e intros) ---------- */
   function actualizarDemo(dt) {
     cam = 400 + ((reloj * 62) % Math.max(1000, M.L - 3200));
     demo.flapT -= dt;
     if (demo.flapT <= 0) { demo.flapT = 2.6 + Math.random() * 2; demo.amp = 1; }
     demo.amp = Math.max(0, demo.amp - dt * 0.9); demo.fase += dt * (6 + demo.amp * 12);
-    for (let i = M.part.length - 1; i >= 0; i--) { M.part.splice(i, 1); }
+    for (let i = M.part.length - 1; i >= 0; i--) M.part.splice(i, 1);
   }
 
   function frame(ts) {
@@ -1233,8 +995,8 @@ const Juego = (() => {
   }
 
   return { iniciar, nuevaPartida, empezarNivel, reiniciarNivel, pausar, reanudar, alMenu, responder, continuarTrasPregunta, siguienteNivel,
-    indiceNivel: () => nivelIdx, herirJugador: (i, causa) => herir(jugadores[i], causa || "cables"),   // gancho para pruebas
-     get estado() { return estado; }, get jugadores() { return jugadores; }, get mundo() { return M; } };
+    indiceNivel: () => nivelIdx, herirJugador: (i, causa) => herir(jugadores[i], causa || "cables"),
+    get estado() { return estado; }, get jugadores() { return jugadores; }, get mundo() { return M; } };
 })();
 
 Juego.iniciar();

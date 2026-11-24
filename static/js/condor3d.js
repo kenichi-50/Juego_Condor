@@ -55,6 +55,10 @@ const Condor3D = (() => {
     rocaOscura: pal(["#5c4f45", "#4f443b", "#665850", "#463c35"]),
     tronco: pal(["#6a4a33", "#5a3e2a", "#7a5a40"]),
     hojaFrailejon: pal(["#c3d1ab", "#aebf95", "#d3ddbf", "#9fb386"]),
+    chulloA: pal(["#d9503a", "#f0b942", "#2e6f9e"]),
+    chulloB: pal(["#f2f6f8", "#d9992b", "#b8423a"]),
+    sombreroAla: pal(["#b88b5a", "#a37748", "#8f653a"]),
+    sombreroCopa: pal(["#8c6239", "#75502c", "#5e3f22"]),
   };
 
   /* ---------- Constructores de mallas ---------- */
@@ -95,7 +99,6 @@ const Condor3D = (() => {
     }
   }
 
-  /* Superficie por anillos (para el pico). Cada anillo es una lista de puntos. */
   function loft(out, anillos, punta, paleta, parte, oc, sem = 1) {
     let k = 0;
     for (let r = 0; r < anillos.length - 1; r++) {
@@ -110,14 +113,12 @@ const Condor3D = (() => {
   }
   const anilloXY = (cx, cy, cz, rx, ry, seg) => Array.from({ length: seg }, (_, i) => { const a = (TAU * i) / seg; return [cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, cz]; });
 
-  /* Disco plano orientado (ojos). squash achata en vertical para parpadear. */
   function disco(out, c, n, r, col, parte, bias, squash = 1, seg = 9) {
     const u = norm(cross(n, [0, 1, 0])), w = cross(u, n);
     const pts = Array.from({ length: seg }, (_, i) => { const a = (TAU * i) / seg; return add(c, add(mul(u, Math.cos(a) * r), mul(w, Math.sin(a) * r * squash))); });
     for (let i = 0; i < seg; i++) tri(out, c, pts[i], pts[(i + 1) % seg], col, null, parte, bias);
   }
 
-  /* Pluma plana de doble cara: base, dirección, ancho */
   function pluma(out, base, dir, lat, L, w, paleta, parte, sem) {
     const bl = sub(base, mul(lat, w)), br = add(base, mul(lat, w));
     const m = add(base, mul(dir, L * 0.55)), ml = sub(m, mul(lat, w * 0.9)), mr = add(m, mul(lat, w * 0.9)), tip = add(base, mul(dir, L));
@@ -153,14 +154,13 @@ const Condor3D = (() => {
     const centro = [0, 0.012, 0];
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n;
-      tri(out, centro, Ri[i], Ri[j], elegir(PAL.sombra, i, 5), oc, "isla");                         // sombra bajo el cóndor
+      tri(out, centro, Ri[i], Ri[j], elegir(PAL.sombra, i, 5), oc, "isla");
       const liq = hash(i, 6, 2) > 0.8 ? PAL.liquen : PAL.suelo;
       tri(out, Ri[i], R0[i], R0[j], elegir(liq, i, 6), oc, "isla"); tri(out, Ri[i], R0[j], Ri[j], elegir(PAL.suelo, i + 3, 7), oc, "isla");
       tri(out, R0[i], R1[i], R1[j], elegir(PAL.roca, i, 8), oc, "isla"); tri(out, R0[i], R1[j], R0[j], elegir(PAL.roca, i + 2, 9), oc, "isla");
       tri(out, R1[i], R2[i], R2[j], elegir(PAL.rocaOscura, i, 10), oc, "isla"); tri(out, R1[i], R2[j], R1[j], elegir(PAL.roca, i + 4, 11), oc, "isla");
       tri(out, R2[i], punta, R2[j], elegir(PAL.rocaOscura, i + 1, 12), oc, "isla");
     }
-    // frailejones: la planta símbolo del páramo
     [[0.62, -0.42, 0.9], [-0.7, 0.34, 0.75], [0.35, 0.62, 0.6]].forEach(([x, z, e], q) => {
       const alto = 0.34 * e;
       tronco(out, [x, 0, z], [x, alto, z], 0.04 * e, 0.032 * e, 5, PAL.tronco, "isla", q + 20);
@@ -169,23 +169,19 @@ const Condor3D = (() => {
         pluma(out, [x, alto, z], dir, lat, 0.2 * e, 0.035 * e, PAL.hojaFrailejon, "isla", k + q * 9);
       }
     });
-    // piedritas flotantes que giran con la isla
     [[1.35, -0.5, 0.3, 0.13], [-1.25, -0.75, -0.5, 0.1], [0.5, -0.95, 1.2, 0.09], [-0.4, -0.3, -1.3, 0.11]].forEach(([x, y, z, r], q) =>
       elipsoide(out, x, y, z, r, r * 0.8, r, 5, 3, PAL.roca, "isla", { jit: 0.3, sem: q + 40 }));
     return out;
   }
 
-  /* ---------- Partes fijas del cóndor (según sexo y edad) ---------- */
+  /* ---------- Partes fijas del cóndor ---------- */
   function construirFijo(macho, edad) {
     const P = PAL[edad], out = [];
-    // cuerpo redondo e inclinado hacia adelante, como un cóndor posado
     const cuerpo = [];
     elipsoide(cuerpo, 0, 0.82, -0.04, 0.34, 0.48, 0.3, 9, 6, P.cuerpo, "plumaje", { jit: 0.09, sem: 1 });
     girarEn(cuerpo, [0, 0.82, -0.04], [["rx", 0.6]]);
     out.push(...cuerpo);
-    // pantalones (muslos emplumados)
     [-1, 1].forEach((sg, q) => elipsoide(out, sg * 0.16, 0.44, 0.02, 0.13, 0.17, 0.15, 6, 4, P.cuerpo, "plumaje", { jit: 0.1, sem: 50 + q }));
-    // collar blanco esponjoso
     const collar = [], cc = [0, 1.2, 0.22];
     elipsoide(collar, cc[0], cc[1], cc[2], 0.24, 0.125, 0.23, 9, 4, P.collar, "collar", { jit: 0.1, sem: 60 });
     const borde = (a, r, y) => [Math.cos(a) * r, y, cc[2] + Math.sin(a) * r * 0.95];
@@ -195,12 +191,10 @@ const Condor3D = (() => {
     }
     girarEn(collar, cc, [["rx", 0.45]]);
     out.push(...collar);
-    // cola corta y negra
     for (let k = 0; k < 5; k++) {
       const a = (k - 2) * 0.28, dir = norm([Math.sin(a) * 0.6, -0.55, -0.85]), lat = norm(cross(dir, [0, 1, 0]));
       pluma(out, [0, 0.46, -0.28], dir, lat, 0.56, 0.085, P.cola, "cola", k * 3);
     }
-    // patas parecidas a las de una gallina
     [-1, 1].forEach((sg, q) => {
       const x = sg * 0.15;
       const inicio = out.length;
@@ -218,16 +212,14 @@ const Condor3D = (() => {
     return out;
   }
 
-  /* ---------- Cabeza grande y tierna (mira, asiente, parpadea) ---------- */
+  /* ---------- Cabeza y accesorios opcionales ---------- */
   function construirCabeza(macho, blink) {
     const out = [], piel = macho ? PAL.pielMacho : PAL.pielHembra;
     tronco(out, [0, 1.17, 0.2], [0, 1.4, 0.36], 0.11, 0.09, 7, piel, "cabeza", 2);
     elipsoide(out, 0, 1.5, 0.42, 0.15, 0.15, 0.18, 7, 5, piel, "cabeza", { jit: macho ? 0.17 : 0.08, sem: macho ? 3 : 4 });
-    // pico en gancho, afilado como un cuchillo
     loft(out, [anilloXY(0, 1.47, 0.58, 0.066, 0.06, 6), anilloXY(0, 1.47, 0.68, 0.052, 0.05, 6), anilloXY(0, 1.45, 0.755, 0.033, 0.04, 6)],
       [0, 1.365, 0.8], PAL.pico, "pico", [0, 1.44, 0.68], 5);
     loft(out, [anilloXY(0, 1.42, 0.575, 0.05, 0.026, 6), anilloXY(0, 1.425, 0.675, 0.038, 0.021, 6)], [0, 1.43, 0.74], PAL.pico, "pico", [0, 1.425, 0.65], 6);
-    // ojos grandes: café claro en el macho, rojizos en la hembra
     const cafe = rgb("#a8742f"), rojo = rgb("#c4211b");
     [-1, 1].forEach((sg) => {
       const n = norm([sg * 0.88, 0.05, 0.35]), c = add([sg * 0.126, 1.535, 0.51], mul(n, 0.008)), sq = blink ? 0.1 : 1;
@@ -246,6 +238,31 @@ const Condor3D = (() => {
     return out;
   }
 
+  function construirAccesorioCabeza(tipo) {
+    const out = [];
+    if (!tipo || tipo === "ninguno") return out;
+    if (tipo === "chullo") {
+      elipsoide(out, 0, 1.58, 0.43, 0.165, 0.11, 0.19, 8, 4, PAL.chulloA, "accesorio", { jit: 0.05, sem: 71 });
+      elipsoide(out, 0, 1.65, 0.42, 0.105, 0.08, 0.12, 7, 3, PAL.chulloB, "accesorio", { jit: 0.04, sem: 72 });
+      for (const sg of [-1, 1]) {
+        const base = [sg * 0.145, 1.54, 0.42];
+        const dir = norm([sg * 0.25, -0.95, 0.1]);
+        const lat = norm(cross(dir, [0, 0, 1]));
+        pluma(out, base, dir, lat, 0.14, 0.032, PAL.chulloB, "accesorio", sg > 0 ? 73 : 74);
+      }
+    } else if (tipo === "sombrero") {
+      const ala = [];
+      elipsoide(ala, 0, 1.61, 0.41, 0.27, 0.025, 0.29, 10, 3, PAL.sombreroAla, "accesorio", { jit: 0.04, sem: 75 });
+      girarEn(ala, [0, 1.61, 0.41], [["rx", -0.14]]);
+      out.push(...ala);
+      const copa = [];
+      elipsoide(copa, 0, 1.68, 0.40, 0.13, 0.085, 0.145, 8, 4, PAL.sombreroCopa, "accesorio", { jit: 0.04, sem: 76 });
+      girarEn(copa, [0, 1.68, 0.40], [["rx", -0.14]]);
+      out.push(...copa);
+    }
+    return out;
+  }
+
   /* ---------- Alas ---------- */
   const U = [0, 0.33, 0.66, 0.94], LEAD = [0, 0, 0.06, 0.2], TRAIL = [0.7, 0.74, 0.66, 0.44], FR = [0, 0.42, 0.9, 1], UMAX = 1.22;
   const interp = (arr, u) => { const i = Math.min(arr.length - 2, Math.max(0, U.findIndex((x, k) => u >= x && u <= U[k + 1]))); return lerp(arr[i], arr[i + 1], (u - U[i]) / (U[i + 1] - U[i])); };
@@ -258,7 +275,7 @@ const Condor3D = (() => {
     const nW = cross(d, t), nOut = nW[0] >= 0 ? nW : mul(nW, -1);
     const lenS = lerp(0.85, 1, s), chS = lerp(0.55, 1, s);
     let S = [0.33, 1.1, 0.08];
-    if (rxS) { const c = Math.cos(rxS), sn = Math.sin(rxS), dy = S[1] - 0.85; S = [S[0], 0.85 + dy * c - S[2] * sn, dy * sn + S[2] * c]; }   // el hombro sigue al cuerpo; el ala queda horizontal
+    if (rxS) { const c = Math.cos(rxS), sn = Math.sin(rxS), dy = S[1] - 0.85; S = [S[0], 0.85 + dy * c - S[2] * sn, dy * sn + S[2] * c]; }
     const pt = (u, v, bul = 0) => {
       let p = add(add(mul(d, u * lenS), mul(t, v * chS)), mul(nOut, bul));
       p[1] += 0.14 * s * Math.pow(u / UMAX, 2);
@@ -277,7 +294,6 @@ const Condor3D = (() => {
       if (b === 2) { paleta = k < 2 ? P.borde : P.ala; parte = k < 2 ? "blancas" : "primarias"; }
       cuad(out, V(k, b), V(k + 1, b), V(k + 1, b + 1), V(k, b + 1), elegir(paleta, q++, 30 + k), parte);
     }
-    // plumas primarias: se abren como dedos
     let punta = null;
     for (let f = 0; f < 7; f++) {
       const ub = 0.44 + 0.068 * f, vb = lerp(interp(LEAD, ub), interp(TRAIL, ub), 0.78), th = ((64 - 8.5 * f) * Math.PI) / 180, L = 0.45 - 0.013 * f;
@@ -288,7 +304,6 @@ const Condor3D = (() => {
       tri(out, ml, mr, tip, elegir(P.ala, f + 4, 33), null, "primarias");
       if (f === 6) punta = tip;
     }
-    // puntos de referencia para los números y la regla de 3 m
     if (lado > 0) { anc.alas = pt(0.35, 0.2); anc.blancas = pt(0.5, 0.45); anc.primarias = pt(1.0, 0.3); }
     return punta;
   }
@@ -299,7 +314,7 @@ const Condor3D = (() => {
   const cache = {};
   const fijo = (macho, edad) => cache[macho + edad] || (cache[macho + edad] = construirFijo(macho, edad));
   const est = {
-    sexo: "macho", edad: "adulto", yaw: 0.6, pitch: 0.2, dist: 3.9, tx: 0, ty: 0.8, tz: 0, spread: 0,
+    sexo: "macho", edad: "adulto", accesorio: "ninguno", yaw: 0.6, pitch: 0.2, dist: 3.9, tx: 0, ty: 0.8, tz: 0, spread: 0,
     t: 0, giro: true, tour: true, manual: false, sel: null, sigue: false, flap: null, pausaHasta: 0, arrastra: false,
     chispas: [], pins: [], puntas: [null, null],
   };
@@ -307,12 +322,12 @@ const Condor3D = (() => {
 
   /* ---------- Cámara y proyección ---------- */
   function vista(p, g) {
-    if (g.rx) { const c = Math.cos(g.rx), sn = Math.sin(g.rx), dy = p[1] - 0.85; p = [p[0], 0.85 + dy * c - p[2] * sn, dy * sn + p[2] * c]; }   // cuerpo horizontal al volar
+    if (g.rx) { const c = Math.cos(g.rx), sn = Math.sin(g.rx), dy = p[1] - 0.85; p = [p[0], 0.85 + dy * c - p[2] * sn, dy * sn + p[2] * c]; }
     const C = g.cam || est;
     let x = p[0] * g.e - C.tx, y = p[1] * g.e + g.dy - C.ty, z = p[2] * g.e - C.tz;
     const yw = C.yaw + Math.PI, cy = Math.cos(yw), sy = Math.sin(yw), cp = Math.cos(C.pitch), sp = Math.sin(C.pitch);
     const x1 = x * cy + z * sy, z1 = -x * sy + z * cy;
-    return [x1, y * cp + z1 * sp, -y * sp + z1 * cp + C.dist];   // cabeceo positivo = cámara por encima mirando hacia abajo
+    return [x1, y * cp + z1 * sp, -y * sp + z1 * cp + C.dist];
   }
   const pantalla = (v, g) => [(g.cx === undefined ? W / 2 : g.cx) + (v[0] * (g.f || F)) / v[2], (g.cy === undefined ? H * 0.56 : g.cy) - (v[1] * (g.f || F)) / v[2]];
   const LUZ = norm([-0.35, 0.8, -0.5]);
@@ -335,7 +350,6 @@ const Condor3D = (() => {
     }
   }
 
-  /* ---------- Fondo ---------- */
   function crearFondo() {
     const c = document.createElement("canvas"); c.width = W; c.height = H;
     const g = c.getContext("2d");
@@ -348,7 +362,6 @@ const Condor3D = (() => {
     return c;
   }
 
-  /* ---------- Chispas y confeti ---------- */
   function chispa(x, y) {
     est.chispas.push({ x, y, vx: (Math.random() - 0.5) * 60, vy: -20 - Math.random() * 50, v: 1.4, r: 6 + Math.random() * 8, c: Math.random() < 0.5 ? "#ffe08a" : "#ffffff", rot: Math.random() * 3 });
   }
@@ -363,23 +376,20 @@ const Condor3D = (() => {
     }
   }
 
-  /* ---------- Fotograma ---------- */
   const angulo = (a, b) => { let d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
 
   function actualizar(dt) {
     est.t += dt;
     const sel = null, ahora = performance.now();
-    // alas
     let obj = est.manual ? est.abrir : 0;
     if (est.tour && !sel && !est.manual) { const c = est.t % 12; obj = c > 2.5 && c < 9.2 ? 1 : 0; }
     if (sel && est.sigue) obj = sel.cam.alas;
     if (est.flap) { obj = 1; est.flap.t += dt; if (est.flap.t > est.flap.dur) est.flap = null; }
     est.spread += (obj - est.spread) * Math.min(1, dt * 3.2);
-    // cámara
     let objYaw = est.yaw, objPitch = lerp(0.2, 0.42, est.spread), objDist = lerp(3.9, 5.3, est.spread), objT = [0, 0.8, 0];
     if (sel && est.sigue) { objYaw = est.yaw + angulo(est.yaw, sel.cam.yaw); objPitch = sel.cam.pitch; objDist = sel.cam.dist; objT = sel.cam.t; }
     else if (!est.arrastra && est.giro && ahora > est.pausaHasta && !sel) est.yaw += dt * (reducido ? 0.2 : 0.7);
-    const esc = est.sexo === "macho" ? 1 : 0.9; objT = objT.map((v) => v * esc);   // el objetivo está en coordenadas del cóndor escalado
+    const esc = est.sexo === "macho" ? 1 : 0.9; objT = objT.map((v) => v * esc);
     const k = Math.min(1, dt * 3.4);
     if (sel && est.sigue) est.yaw += (objYaw - est.yaw) * k;
     if (!est.arrastra || (sel && est.sigue)) est.pitch += (objPitch - est.pitch) * k;
@@ -389,83 +399,57 @@ const Condor3D = (() => {
 
   function cabezaAnimada(macho, t, o = {}) {
     const cab = construirCabeza(macho, o.blink !== undefined ? o.blink : (t % 3.8) < 0.14);
-    girarEn(cab, [0, 1.2, 0.22], [["rz", o.tilt !== undefined ? o.tilt : 0.09 * Math.sin(t * 1.1)], ["rx", o.nod !== undefined ? o.nod : 0.07 * Math.sin(t * 1.7)],
-      ["ry", o.look !== undefined ? o.look : 0.4 * Math.sin(t * 0.8) + 0.15 * Math.sin(t * 2.3)]]);
-    return cab;
+    const acc = construirAccesorioCabeza(o.accesorio);
+    const partes = acc.length ? [...cab, ...acc] : cab;
+    girarEn(partes, [0, 1.2, 0.22], [
+      ["rz", o.tilt !== undefined ? o.tilt : 0.09 * Math.sin(t * 1.1)],
+      ["rx", o.nod !== undefined ? o.nod : 0.07 * Math.sin(t * 1.7)],
+      ["ry", o.look !== undefined ? o.look : 0.4 * Math.sin(t * 0.8) + 0.15 * Math.sin(t * 2.3)],
+    ]);
+    return partes;
   }
 
-  /* ---------- El mismo cóndor, listo para usarse dentro del juego ----------
-     Dibuja el modelo 3D en un lienzo aparte, sin fondo, con un contorno claro
-     para que se vea sobre cualquier paisaje. Lo usa juego.js en cada fotograma.
-     o: {macho, spread (0 plegadas, 1 abiertas), psi (aleteo), rx (cuerpo horizontal),
-         yaw, pitch, dist, f, cx, cy, t, nod, look, tilt, blink} */
-
   function poseCaminata(tris, fase, intensidad) {
-
     if (!intensidad) return tris;
-
     const poses = new Map();
-
     for (const lado of [-1, 1]) {
-
       const ciclo = fase + (lado === 1 ? Math.PI : 0);
-
       const ang = Math.sin(ciclo) * 0.48 * intensidad;
-
       const giro = mover(["rx", ang]);
-
       const pivote = [lado * 0.15, 0.36, 0.05];
-
-      const elevar = Math.max(0, Math.cos(ciclo))
-        * 0.085 * intensidad;
-
+      const elevar = Math.max(0, Math.cos(ciclo)) * 0.085 * intensidad;
       poses.set(lado, (v) => {
-
         const a = add(pivote, giro(sub(v, pivote)));
-
-        a[1] += elevar
-          * clamp((0.36 - v[1]) / 0.36, 0, 1);
-
+        a[1] += elevar * clamp((0.36 - v[1]) / 0.36, 0, 1);
         return a;
       });
     }
-
     return tris.map((t) => {
-
       const f = poses.get(t.ladoPata);
-
-      return f
-        ? {
-            ...t,
-            p: t.p.map(f),
-            o: t.o ? f(t.o) : null
-          }
-        : t;
+      return f ? { ...t, p: t.p.map(f), o: t.o ? f(t.o) : null } : t;
     });
   }
+
   function sprite(c2, o) {
     const macho = o.macho, e = macho ? 1 : 0.9;
     const g = { e, dy: 0, rx: o.rx || 0, cx: o.cx, cy: o.cy, f: o.f, cam: { yaw: o.yaw, pitch: o.pitch, dist: o.dist, tx: 0, ty: 0.85 * e, tz: 0 } };
-    const cab = cabezaAnimada(macho, o.t || 0, { blink: o.blink, nod: o.nod, look: o.look, tilt: o.tilt });
+    const cab = cabezaAnimada(macho, o.t || 0, {
+      blink: o.blink, nod: o.nod, look: o.look, tilt: o.tilt,
+      accesorio: o.accesorio !== undefined ? o.accesorio : est.accesorio,
+    });
     const alas = [], anc = {};
     construirAla(alas, 1, o.spread, o.psi || 0, "adulto", anc, o.rx || 0); construirAla(alas, -1, o.spread, o.psi || 0, "adulto", anc, o.rx || 0);
     const items = [], gAlas = Object.assign({}, g, { rx: 0 });
     const modelo = fijo(macho, "adulto");
+    const modeloAnimado = poseCaminata(modelo, o.pasoFase || 0, o.pasoAmp || 0);
+    agregar(items, modeloAnimado, g, null, 0); agregar(items, cab, g, null, 0); agregar(items, alas, gAlas, null, 0);
 
-    const modeloAnimado = poseCaminata(
-      modelo,
-      o.pasoFase || 0,
-      o.pasoAmp || 0
-    );
-
-    agregar(items, modeloAnimado, g, null, 0);agregar(items, cab, g, null, 0); agregar(items, alas, gAlas, null, 0);
-    
     items.sort((a, b) => b.k - a.k);
     c2.save(); c2.lineJoin = "round";
     const trazo = (it) => { c2.beginPath(); c2.moveTo(it.A[0], it.A[1]); c2.lineTo(it.B[0], it.B[1]); c2.lineTo(it.C[0], it.C[1]); c2.closePath(); };
-    if (o.contorno !== false) {   // contorno tipo pegatina: solo queda visible por fuera de la silueta
+    if (o.contorno !== false) {
       c2.fillStyle = c2.strokeStyle = o.contorno || "rgba(255,248,226,.95)"; c2.lineWidth = (o.grosor || 4.4);
-      c2.beginPath();   // un solo trazo para todos los triángulos: mucho más rápido
+      c2.beginPath();
       for (const it of items) { if (it.p === "ojos" || it.p === "patas") continue; c2.moveTo(it.A[0], it.A[1]); c2.lineTo(it.B[0], it.B[1]); c2.lineTo(it.C[0], it.C[1]); c2.closePath(); }
       c2.fill(); c2.stroke();
     }
@@ -482,8 +466,11 @@ const Condor3D = (() => {
     const blink = (t % 3.8) < 0.14;
     const gc = { e, dy: hop }, gi = { e: 1, dy: 0 };
 
-    // cabeza con vida: mira alrededor, asiente y ladea
-    const cab = cabezaAnimada(macho, t, { blink, nod: 0.07 * Math.sin(t * 1.7) + (fl ? 0.12 * Math.sin(fl.t * 11) : 0) });
+    const cab = cabezaAnimada(macho, t, {
+      blink,
+      nod: 0.07 * Math.sin(t * 1.7) + (fl ? 0.12 * Math.sin(fl.t * 11) : 0),
+      accesorio: est.accesorio,
+    });
     const alas = [], anc = {}, p1 = construirAla(alas, 1, est.spread, psi, est.edad, anc), p2 = construirAla(alas, -1, est.spread, psi, est.edad, anc);
     est.puntas = [p1, p2];
 
@@ -496,7 +483,6 @@ const Condor3D = (() => {
     items.sort((a, b) => b.k - a.k);
 
     ctx.drawImage(fondo, 0, 0, W, H);
-    // nubes que pasan
     [[0.0, 90, 0.9], [0.4, 330, 0.7], [0.75, 150, 1.0]].forEach(([f, y, s], i) => {
       const x = ((f * (W + 400) + t * (8 + i * 4)) % (W + 400)) - 200; LP.nube(ctx, x, y, s, 11 + i * 5, [200, 25, 97], 0.9);
     });
@@ -505,7 +491,6 @@ const Condor3D = (() => {
       ctx.beginPath(); ctx.moveTo(it.A[0], it.A[1]); ctx.lineTo(it.B[0], it.B[1]); ctx.lineTo(it.C[0], it.C[1]); ctx.closePath(); ctx.fill(); ctx.stroke();
     }
 
-    // chispas al abrir las alas
     if ((est.spread > 0.5 || fl) && !reducido && Math.random() < 0.35) {
       const c = pantalla(vista([(Math.random() - 0.5) * 3, 0.8 + Math.random() * 1.4, (Math.random() - 0.5) * 0.6], gc), gc); chispa(c[0], c[1]);
     }
@@ -518,14 +503,29 @@ const Condor3D = (() => {
     actualizar(dt); dibujar(dt);
   }
 
-  /* ---------- Ventana del visor: solo el cóndor y el botón de aletear ---------- */
   const $ = (id) => document.getElementById(id);
   let dlg, ini = false;
+
+  function setAccesorio(tipo) {
+    est.accesorio = tipo || "ninguno";
+    const selAcc = $("v3d-cabeza");
+    if (selAcc) selAcc.value = est.accesorio;
+  }
 
   function iniciarUI() {
     dlg = $("visor"); cv = $("visor-lienzo"); ctx = cv.getContext("2d");
     const dpr = Math.min(window.devicePixelRatio || 1, 2); cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     fondo = crearFondo();
+    const selAcc = $("v3d-cabeza");
+    if (selAcc) {
+      selAcc.value = est.accesorio || "ninguno";
+      selAcc.addEventListener("change", () => {
+        est.accesorio = selAcc.value;
+        if (typeof Almacen !== "undefined" && Almacen.guardarPrefs) {
+          Almacen.guardarPrefs({ accesorio: est.accesorio });
+        }
+      });
+    }
     $("v3d-aletear").addEventListener("click", () => {
       est.flap = { t: 0, dur: 2.6 }; SND.iniciar(); SND.play("aleteo"); setTimeout(() => SND.play("aleteo"), 280); setTimeout(() => SND.play("aleteo"), 560);
     });
@@ -536,7 +536,6 @@ const Condor3D = (() => {
       cancelAnimationFrame(raf); raf = 0;
       if (typeof Juego !== "undefined" && Juego.estado === "menu") UI.menu();
     });
-    // arrastrar para girarlo a mano
     let dx0 = 0, abajo = false;
     const px = (e) => { const r = cv.getBoundingClientRect(); return ((e.clientX - r.left) / r.width) * W; };
     cv.addEventListener("pointerdown", (e) => { abajo = true; dx0 = px(e); est.arrastra = true; cv.setPointerCapture(e.pointerId); });
@@ -548,7 +547,10 @@ const Condor3D = (() => {
 
   function abrir(sexo) {
     if (!ini) iniciarUI();
-    est.sexo = sexo || Almacen.prefs.sexo || "macho";
+    est.sexo = sexo || (typeof Almacen !== "undefined" && Almacen.prefs && Almacen.prefs.sexo) || "macho";
+    est.accesorio = (typeof Almacen !== "undefined" && Almacen.prefs && Almacen.prefs.accesorio) || est.accesorio || "ninguno";
+    const selAcc = $("v3d-cabeza");
+    if (selAcc) selAcc.value = est.accesorio;
     est.edad = "adulto"; est.giro = true; est.tour = true; est.manual = false; est.spread = 0; est.yaw = 0.6; est.t = 0; est.flap = null;
     est.pitch = 0.2; est.dist = 3.9; est.tx = 0; est.ty = 0.8; est.tz = 0; est.chispas = []; est.pausaHasta = 0;
     if (!dlg.open) dlg.showModal();
@@ -556,5 +558,5 @@ const Condor3D = (() => {
     $("v3d-aletear").focus({ preventScroll: true });
   }
 
-  return { abrir, estado: est, sprite };
+  return { abrir, estado: est, sprite, setAccesorio };
 })();
