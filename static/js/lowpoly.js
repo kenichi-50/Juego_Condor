@@ -226,14 +226,9 @@ const LP = (() => {
   }
 
   /* ---------- Carroña y huesos ---------- */
-  function carrona(ctx, x, y, s, comida, venenosa, t) {
+  function carrona(ctx, x, y, s, comida, venenosa) {
     ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
-    const piel = venenosa ? [282, 44, 38] : [24, 38, 36];
-    if (venenosa && comida < 1) {   // aura morada que late
-      ctx.globalAlpha = 0.22 + 0.1 * Math.sin((t || 0) * 3);
-      blob(ctx, 8, -14, 50, 7, 3, ["#b46cff", "#8e3fe0"], t || 0);
-      ctx.globalAlpha = 1;
-    }
+    const piel = venenosa ? [278, 46, 36] : [24, 38, 36];      // la carroña envenenada es de color morado
     if (comida < 1) {
       // cuerpo caído (una llama), de lado
       const cuerpo = [[-34, -6], [-26, -24], [4, -28], [30, -20], [36, -4], [14, 2], [-20, 2]];
@@ -245,7 +240,7 @@ const LP = (() => {
       [[-20, -24, -26, -44], [-6, -28, -8, -48], [14, -26, 18, -46], [26, -22, 32, -40]].forEach((l, i) =>
         tri(ctx, l[0] - 3, l[1], l[0] + 3, l[1], l[2], l[3], luz(piel, -14 + i)));
       // costillas
-      for (let k = 0; k < 4; k++) tri(ctx, -16 + k * 11, -26, -11 + k * 11, -26, -13 + k * 11, -14, luz([48, 20, 80], -4 * k));
+      for (let k = 0; k < 4; k++) tri(ctx, -16 + k * 11, -26, -11 + k * 11, -26, -13 + k * 11, -14, venenosa ? luz([285, 60, 72], -4 * k) : luz([48, 20, 80], -4 * k));
     }
     if (comida > 0) {
       ctx.globalAlpha = clamp(comida, 0, 1);
@@ -275,7 +270,7 @@ const LP = (() => {
     const y2 = y + Math.sin(t * 5) * 3;
     ctx.save();
     if (venenosa) {
-      blob(ctx, x, y2, 20, 4, 1, ["#9b4dff", "#6a25c9", "#c08cff"], Math.PI / 4);
+      blob(ctx, x, y2, 20, 4, 1, ["#9b4dff", "#6f2bd1", "#b980ff"], Math.PI / 4);
       ctx.fillStyle = "#fff"; ctx.font = "700 17px 'Chakra Petch', system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText("!", x, y2 + 1);
     } else {
@@ -294,46 +289,6 @@ const LP = (() => {
     tri(ctx, 0, -13, 7, 0, 0, 13, "#ffcf55");
     tri(ctx, 0, -13, -7, 0, 0, 13, "#fff2c7");
     tri(ctx, 0, -13, 2, 0, 0, 13, "#e9a93a");
-    ctx.restore();
-  }
-
-
-  /* ---------- Pluma dorada temporal ---------- */
-  function plumaDorada(ctx, x, y, t, vida) {
-    const b = Math.sin(t * 4) * 5, r = Math.sin(t * 2.2) * 0.3 - 0.35;
-    ctx.save(); ctx.translate(x, y + b);
-    ctx.globalAlpha = 0.3 + 0.15 * Math.sin(t * 6); blob(ctx, 0, 0, 44, 8, 5, ["#ffe08a", "#ffcf55"], t);
-    ctx.globalAlpha = 0.2; blob(ctx, 0, 0, 62, 8, 6, ["#fff2c7"], -t * 0.7);
-    ctx.globalAlpha = 1; ctx.rotate(r); ctx.scale(1.9, 1.9);
-    tri(ctx, 0, -14, 8, 0, 0, 14, "#ffcf55");
-    tri(ctx, 0, -14, -8, 0, 0, 14, "#fff7d6");
-    tri(ctx, 0, -14, 2.4, 0, 0, 14, "#e9a93a");
-    tri(ctx, -8, 0, 0, 14, -3, 18, "#ffe08a");     // raquis
-    ctx.restore();
-    // destellos
-    for (let k = 0; k < 4; k++) {
-      const a = t * 2 + k * 1.57, d = 34 + 8 * Math.sin(t * 5 + k);
-      tri(ctx, x + Math.cos(a) * d - 3, y + Math.sin(a) * d + 2, x + Math.cos(a) * d + 3, y + Math.sin(a) * d + 2, x + Math.cos(a) * d, y + Math.sin(a) * d - 5, "#fff7d6");
-    }
-  }
-
-  /* ---------- Aro dorado (impulso) ---------- */
-  function aro(ctx, x, y, r, t, activo) {
-    const N = 12, giro = t * 0.6;
-    ctx.save();
-    ctx.globalAlpha = 0.25 + 0.1 * Math.sin(t * 4);
-    blob(ctx, x, y, r * 1.35, 12, 9, ["#ffe08a", "#ffcf55"], t * 0.3);
-    ctx.globalAlpha = 1;
-    for (let k = 0; k < N; k++) {
-      const a0 = giro * 0.2 + (k / N) * TAU, a1 = a0 + TAU / N, am = (a0 + a1) / 2, ri = r - 15;
-      const cols = ["#ffcf55", "#fff2c7", "#e9a93a", "#ffe08a"];
-      tri(ctx, x + Math.cos(a0) * r, y + Math.sin(a0) * r * 1.12, x + Math.cos(a1) * r, y + Math.sin(a1) * r * 1.12, x + Math.cos(am) * ri, y + Math.sin(am) * ri * 1.12, cols[k % 4]);
-      tri(ctx, x + Math.cos(a0) * ri, y + Math.sin(a0) * ri * 1.12, x + Math.cos(a1) * ri, y + Math.sin(a1) * ri * 1.12, x + Math.cos(a0) * r, y + Math.sin(a0) * r * 1.12, cols[(k + 2) % 4]);
-    }
-    for (let k = 0; k < 6; k++) {          // chispas que giran
-      const a = -giro * 2 + k * 1.047, d = r + 14 + 5 * Math.sin(t * 6 + k);
-      tri(ctx, x + Math.cos(a) * d - 4, y + Math.sin(a) * d + 3, x + Math.cos(a) * d + 4, y + Math.sin(a) * d + 3, x + Math.cos(a) * d, y + Math.sin(a) * d - 6, "#fff7d6");
-    }
     ctx.restore();
   }
 
@@ -453,10 +408,9 @@ const LP = (() => {
     if (o.alpha !== undefined && o.alpha < 1) ctx.globalAlpha = o.alpha;
     const plegada = o.suelo && !o.aleteando;
     const amp = o.amp || 0, fase = o.fase || 0;
-    const pic = o.picada || 0;   // 0 = alas abiertas, 1 = alas recogidas en picada
-    const aNear = plegada ? -3.95 : -2.5 + 0.95 * amp * Math.sin(fase) + pic * (-3.45 + 2.5);
-    const aFar = plegada ? -4.1 : -2.62 + 0.95 * amp * Math.sin(fase - 0.55) + pic * (-3.6 + 2.62);
-    const len = plegada ? 50 : 72 - pic * 16;
+    const aNear = plegada ? -3.95 : -2.5 + 0.95 * amp * Math.sin(fase);
+    const aFar = plegada ? -4.1 : -2.62 + 0.95 * amp * Math.sin(fase - 0.55);
+    const len = plegada ? 50 : 72;
     // sombra de ala lejana
     ala(ctx, -2, -8, aFar, len * 0.95, true, true);
     // patas
@@ -479,10 +433,12 @@ const LP = (() => {
       tri(ctx, 17, -8, 21, -4, 22 + hx, -14 + hy, "#4a3d42");
       tri(ctx, 21, -4, 22 + hx, -4 + hy, 22 + hx, -14 + hy, "#5a4a50");
     }
-    abanico(ctx, 30 + hx, -10 + hy, cab, ["#8b7378", "#6e5a5f", "#9a8185", "#5d4a50", "#7c666b", "#a38b8e"]);
+    abanico(ctx, 30 + hx, -10 + hy, cab, o.macho
+      ? ["#d9593f", "#c94a38", "#e5774a", "#b8423a", "#ec8f54", "#d24f3b"]          // macho: cabeza roja y anaranjada
+      : ["#8d9096", "#797c83", "#a1a4aa", "#6f7279", "#9b9092", "#a8aaaf"]);        // hembra: cabeza gris
     if (o.macho) {
-      tri(ctx, 26 + hx, -18 + hy, 38 + hx, -24 + hy, 38 + hx, -14 + hy, "#e0452e");
-      tri(ctx, 38 + hx, -14 + hy, 32 + hx, -3 + hy, 38 + hx, -5 + hy, "#c9372a");
+      tri(ctx, 26 + hx, -18 + hy, 38 + hx, -24 + hy, 38 + hx, -14 + hy, "#8a3f3d");
+      tri(ctx, 38 + hx, -14 + hy, 32 + hx, -3 + hy, 38 + hx, -5 + hy, "#f0a24f");
     }
     // pico
     tri(ctx, 38 + hx, -13 + hy, 49 + hx, -6 + hy, 38 + hx, -6 + hy, "#f1ecde");
@@ -492,6 +448,53 @@ const LP = (() => {
     ctx.beginPath(); ctx.arc(33 + hx, -10 + hy, 2.1, 0, TAU); ctx.fill();
     // ala cercana
     ala(ctx, 4, -9, aNear, len, false, true);
+    ctx.restore();
+  }
+
+
+  /* ---------- Poderes (orbes brillantes) ---------- */
+  function tono(hex, k) {
+    const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255], m = k >= 0 ? 255 : 0, f = Math.abs(k);
+    return `rgb(${c.map((v) => Math.round(v + (m - v) * f)).join(",")})`;
+  }
+  function poder(ctx, x, y, tipo, color, t, fase) {
+    const b = Math.sin(t * 2.6 + fase) * 5, pul = 1 + Math.sin(t * 4 + fase) * 0.09;
+    ctx.save(); ctx.translate(x, y + b);
+    ctx.globalAlpha = 0.26; blob(ctx, 0, 0, 38 * pul, 8, (fase * 3) | 0, [tono(color, 0.45)], t * 0.4);
+    ctx.globalAlpha = 0.4; blob(ctx, 0, 0, 28 * pul, 6, 5, [tono(color, 0.3)], -t * 0.5);
+    ctx.globalAlpha = 1;
+    const pts = Array.from({ length: 6 }, (_, i) => [Math.cos((i / 6) * TAU + 0.5) * 20, Math.sin((i / 6) * TAU + 0.5) * 20]);
+    abanico(ctx, 0, 0, pts, [tono(color, 0.3), color, tono(color, -0.25), tono(color, 0.12), tono(color, -0.12), tono(color, 0.4)]);
+    const w = "#ffffff", w2 = "rgba(255,255,255,.7)";
+    if (tipo === "escudo") { poligono(ctx, [[-9, -10], [9, -10], [9, 2], [0, 12], [-9, 2]], w); poligono(ctx, [[0, -10], [9, -10], [9, 2], [0, 12]], w2); }
+    else if (tipo === "rafaga") { [-8, 0, 8].forEach((o, i) => { poligono(ctx, [[-11 + i * 2, o - 2], [5, o - 2], [5, o - 5], [12, o], [5, o + 5], [5, o + 2], [-11 + i * 2, o + 2]], i === 1 ? w : w2); }); }
+    else if (tipo === "termica") { poligono(ctx, [[0, -12], [11, 0], [4, 0], [4, 11], [-4, 11], [-4, 0], [-11, 0]], w); poligono(ctx, [[0, -12], [11, 0], [4, 0], [0, -4]], w2); }
+    else if (tipo === "iman") { poligono(ctx, [[-10, -10], [-4, -10], [-4, 3], [4, 3], [4, -10], [10, -10], [10, 6], [0, 13], [-10, 6]], w); tri(ctx, -10, -10, -4, -10, -4, -5, "#ff6a5a"); tri(ctx, 10, -10, 4, -10, 4, -5, "#ff6a5a"); }
+    else { poligono(ctx, [[3, -12], [-7, 2], [-1, 2], [-4, 12], [8, -3], [1, -3]], w); }
+    ctx.restore();
+  }
+  function escudo(ctx, x, y, t, a) {
+    ctx.save(); ctx.translate(x, y);
+    const r = 50 + Math.sin(t * 6) * 2, pts = Array.from({ length: 7 }, (_, i) => [Math.cos((i / 7) * TAU + t * 0.6) * r, Math.sin((i / 7) * TAU + t * 0.6) * r * 0.9]);
+    ctx.globalAlpha = a * 0.2; abanico(ctx, 0, 0, pts, ["#8fdcff", "#6fd3ff", "#b6ecff"]);
+    ctx.globalAlpha = a * 0.95; ctx.strokeStyle = "#c9f0ff"; ctx.lineWidth = 3; ctx.lineJoin = "round";
+    ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath(); ctx.stroke();
+    ctx.restore();
+  }
+
+
+  /* ---------- Bandera de punto de control ---------- */
+  function bandera(ctx, x, y, activo, t, anim) {
+    const alto = 118, cols = activo ? ["#ffe9a8", "#ffd46e", "#f0b942"] : ["#a1a9c9", "#8a93b8", "#6f7aa3"];
+    ctx.save(); ctx.translate(x, y);
+    poligono(ctx, [[-17, 0], [17, 0], [11, -10], [-11, -10]], "#6a5b4f"); tri(ctx, -17, 0, 0, 0, -11, -10, "#7b6a5c");
+    poligono(ctx, [[-2.5, -8], [2.5, -8], [1.6, -alto], [-1.6, -alto]], "#d9d0c0"); tri(ctx, 0, -8, 2.5, -8, 1.6, -alto, "#b9b0a0");
+    tri(ctx, -5, -alto, 5, -alto, 0, -alto - 10, activo ? "#ffd46e" : "#9aa3c7");
+    const fy = -alto + 8 + (activo ? (1 - anim) * 38 : 62), w = Math.sin(t * 5) * 4;
+    if (activo) { ctx.globalAlpha = 0.25; blob(ctx, 24, fy + 12, 34, 8, 3, ["#ffe08a"], t * 0.5); ctx.globalAlpha = 1; }
+    tri(ctx, 1.6, fy, 40 + w, fy + 8 + w * 0.5, 1.6, fy + 15, cols[0]);
+    tri(ctx, 1.6, fy + 15, 40 + w, fy + 8 + w * 0.5, 1.6, fy + 30, cols[1]);
+    tri(ctx, 1.6, fy, 22, fy + 3, 1.6, fy + 12, cols[2]);
     ctx.restore();
   }
 
@@ -505,6 +508,6 @@ const LP = (() => {
   }
 
   return { W, H, hash, hsl, luz, clamp, tri, tri2, poligono, blob, abanico, crearCielo, sol, crearVolcan, terreno,
-    frailejon, pajonal, roca, nube, nubeTormenta, termica, carrona, gallinazo, marcador, pluma, plumaDorada, aro, torre, cable,
-    cazador, rayo, nido, condor, particula };
+    frailejon, pajonal, roca, nube, nubeTormenta, termica, carrona, gallinazo, marcador, pluma, torre, cable,
+    cazador, rayo, nido, condor, particula, poder, escudo, tono, bandera };
 })();

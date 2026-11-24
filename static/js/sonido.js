@@ -65,7 +65,10 @@ const SND = (() => {
     logro: () => [523, 659, 784, 1047].forEach((f, i) => tono(f, 0.22, "triangle", 0.07, 0, i * 0.09)),
     nido: () => [392, 523, 659, 784, 1047].forEach((f, i) => tono(f, 0.3, "triangle", 0.07, 0, i * 0.12)),
     gameover: () => [392, 330, 262, 196].forEach((f, i) => tono(f, 0.35, "triangle", 0.07, 0, i * 0.2)),
+    control: () => [392, 523, 659, 784].forEach((f, i) => tono(f, 0.26, "triangle", 0.07, 0, i * 0.1)),
     termica: () => tono(330, 0.5, "sine", 0.04, 1.6),
+    poder: () => [523, 784, 1175, 1568].forEach((f, i) => tono(f, 0.18, "triangle", 0.07, 0, i * 0.06)),
+    escudo: () => { tono(900, 0.12, "square", 0.05, 0.5); soplo(0.1, 2400, 0.1, 2); },
   };
 
   /* Melodía pentatónica menor (La) que camina al azar */
