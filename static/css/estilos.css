@@ -23,7 +23,7 @@
   --corte: 16px;
   --display: "Chakra Petch", "Trebuchet MS", system-ui, sans-serif;
   --cuerpo: "Atkinson Hyperlegible", "Segoe UI", Verdana, sans-serif;
-  --reserva: 150px;           /* alto que ocupan HUD y pie al calcular el tamaño del juego */
+  --reserva: 196px;           /* alto que ocupan HUD y pie al calcular el tamaño del juego */
 }
 
 * { box-sizing: border-box; }
@@ -60,16 +60,14 @@ kbd {
 /* ---------- Superficies facetadas ---------- */
 .panel {
   --c: var(--corte);
-  position: relative; isolation: isolate;
-  background: var(--borde);
+  position: relative;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(155deg, var(--faceta-a) 0 52%, var(--faceta-b) 52% 100%) padding-box,
+    var(--borde) border-box;
   clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c));
   padding: 26px 30px;
   width: min(100%, 520px);
-}
-.panel::before {
-  content: ""; position: absolute; inset: 2px; z-index: -1;
-  background: linear-gradient(155deg, var(--faceta-a) 0 52%, var(--faceta-b) 52% 100%);
-  clip-path: polygon(calc(var(--c) - 1px) 0, 100% 0, 100% calc(100% - var(--c) + 1px), calc(100% - var(--c) + 1px) 100%, 0 100%, 0 calc(var(--c) - 1px));
 }
 .panel.ancho { width: min(100%, 860px); }
 h1, h2, h3 { font-family: var(--display); margin: 0; line-height: 1.1; }
@@ -150,7 +148,6 @@ p { margin: 0 0 12px; }
 .nivel-nombre { font: 700 1rem var(--display); color: var(--ocre); }
 .ruta { position: relative; width: 100%; height: 8px; background: #10152b; clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%); }
 .ruta i { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(100deg, #ffd46e 0 50%, var(--ocre-b) 50% 100%); }
-.ruta-aro { position: absolute; top: 0; bottom: 0; left: 75%; width: 5px; margin-left: -2px; background: #ffffff; box-shadow: 0 0 6px 1px #ffcf55; z-index: 1; }
 .ruta b { position: absolute; top: -3px; width: 12px; height: 14px; margin-left: -6px; background: var(--nieve); clip-path: polygon(50% 0, 100% 100%, 0 100%); left: 0; transform: rotate(90deg); }
 .cifras { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 14px; font-size: .84rem; color: var(--suave); }
 .cifras b { color: var(--nieve); font: 700 .95rem var(--display); }
@@ -258,6 +255,13 @@ p { margin: 0 0 12px; }
 .gran-puntaje small { font-size: 1rem; color: var(--suave); font-weight: 500; }
 .mensaje-final { margin: 10px 0 14px; padding: 14px 16px; background: linear-gradient(155deg, #2e3a6b 0 55%, #273260 55% 100%); }
 .mensaje-final p { margin: 0; }
+.form-puntaje label { display: block; font: 600 .95rem var(--display); margin-bottom: 6px; }
+.fila-form { display: flex; gap: 10px; flex-wrap: wrap; }
+.fila-form input {
+  flex: 1 1 180px; min-width: 0; font: 500 1rem var(--cuerpo); color: var(--nieve); padding: 11px 14px;
+  background: #10152b; border: 2px solid #3a4778; border-radius: 0;
+}
+.mini-ranking { margin-top: 12px; }
 
 /* ---------- Avisos dentro del juego ---------- */
 .avisos { position: absolute; top: 12px; right: 12px; width: min(360px, 42%); z-index: 6; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
@@ -374,11 +378,61 @@ p { margin: 0 0 12px; }
   .barra.baja i { animation: none; }
 }
 
-/* ---- Pluma dorada y aro dorado ---- */
-.toast.pluma-dorada { background: linear-gradient(155deg, #ffe08a 0 55%, #f0b441 55% 100%); color: #2a1d05; box-shadow: 0 0 0 2px #fff2c7, 0 0 22px rgba(255, 207, 85, .65); }
-.toast.pluma-dorada strong { color: #2a1d05; }
-.toast.pluma-dorada small { color: #5b4310; }
-.toast.pluma-dorada .bono { font-weight: 700; color: #6a3f00; }
-.capa.aro { background: radial-gradient(circle at 50% 45%, rgba(255, 207, 85, .22), rgba(12, 16, 36, .62) 70%); }
-.aro-panel { border-top: 4px solid #ffcf55; }
-.aro-panel .num-nivel { color: #ffcf55; }
+/* =====================================================================
+   Visor 3D del cóndor: solo el cóndor girando y el botón de aletear
+   ===================================================================== */
+.visor { border: 0; padding: 0; background: transparent; color: var(--nieve); width: min(920px, 96vw); max-width: none; max-height: 96dvh; overflow: visible; }
+.visor::backdrop { background: rgba(8, 10, 26, .85); }
+.visor[open] { animation: visor-entra .35s ease-out; }
+@keyframes visor-entra { from { opacity: 0; transform: translateY(18px) scale(.97); } }
+.visor-caja { position: relative; display: grid; justify-items: center; gap: 12px; }
+#visor-lienzo {
+  width: 100%; height: auto; max-height: calc(96dvh - 80px); aspect-ratio: 16 / 9; display: block; cursor: grab; touch-action: none; background: #5f8fcb;
+  clip-path: polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px);
+}
+#visor-lienzo:active { cursor: grabbing; }
+.visor-cerrar {
+  --c: 9px; position: absolute; top: 12px; right: 12px; width: 44px; height: 44px; border: 0; cursor: pointer; color: var(--nieve); font-size: 1.1rem;
+  background: linear-gradient(160deg, rgba(60, 74, 130, .92) 0 50%, rgba(51, 64, 111, .92) 50% 100%);
+  clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c));
+}
+.visor-cerrar:hover { filter: brightness(1.25); }
+@media (prefers-reduced-motion: reduce) { .visor[open] { animation: none; } }
+
+/* ---------- Modo de vuelo y poderes en el HUD ---------- */
+.estado-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 5px; min-height: 24px; }
+.jug.der .estado-fila { justify-content: flex-end; }
+.modo {
+  --mc: #9aa3c7; display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px 3px 9px; font: 700 .8rem var(--display); color: var(--mc);
+  background: #10152b; clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+.modo i { width: 10px; height: 10px; background: var(--mc); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.modo[data-modo="aleteando"] { --mc: #ffb06a; }
+.modo[data-modo="planeando"] { --mc: #9fe3ff; }
+.modo[data-modo="termica"] { --mc: #ffd46e; }
+.modo[data-modo="picada"] { --mc: #ff8a7a; }
+.modo[data-modo="comiendo"] { --mc: #8fe58a; }
+.poderes { display: inline-flex; flex-wrap: wrap; gap: 5px; }
+.pod {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 7px; font: 600 .72rem var(--display); color: #10152b;
+  background: var(--c); clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+}
+.pod i { width: 8px; height: 8px; background: #10152b; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); opacity: .7; }
+.pod b { font-weight: 700; }
+.sub-poderes { margin-top: 14px; }
+.rejilla-poderes { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rejilla-poderes li { display: flex; gap: 10px; align-items: center; padding: 8px 10px; background: #19213f; }
+.rejilla-poderes .orbe { flex: none; width: 26px; height: 28px; background: var(--c); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+.rejilla-poderes div { display: flex; flex-direction: column; font-size: .82rem; color: var(--suave); }
+.rejilla-poderes strong { font: 600 .92rem var(--display); color: var(--nieve); }
+@media (max-width: 880px) { .rejilla-poderes { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { :root { --reserva: 235px; } .modo { font-size: .74rem; } }
+@media (max-height: 520px) and (orientation: landscape) {
+  .estado-fila { margin-top: 2px; min-height: 0; gap: 3px 5px; }
+  .modo { font-size: .62rem; padding: 1px 8px 1px 6px; }
+  .pod { font-size: .6rem; padding: 1px 6px; }
+}
+
+/* marcas de puntos de control sobre la barra de progreso */
+.ruta .marcas u { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1px; background: #7380b8; }
+.ruta .marcas u.on { background: #ffd46e; box-shadow: 0 0 4px #ffd46e; }

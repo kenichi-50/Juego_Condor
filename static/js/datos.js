@@ -90,22 +90,37 @@ const FISICA = {
   aleteoEspera: 0.24,       // segundos entre aleteos
   despegueMultiplicador: 3, // despegar del suelo cuesta el triple (dato real)
   velMin: 70, velMax: 250, aceleracion: 280,
-  picadaVel: 350, picadaAcel: 620,   // picada: acelera de forma progresiva (más suave)
-  picadaRampa: 0.4,                  // segundos que tarda la picada en alcanzar toda su fuerza
-  picadaSoltar: 3.2,                 // qué tan rápido se recupera el vuelo al soltar ↓ (más bajo = más suave)
-  plumaEnergia: 0.25,                // la pluma dorada devuelve el 25 % de la energía máxima
-  plumaDoradaViaje: 5.2,             // segundos que tarda la pluma dorada en cruzar la pantalla
-  plumaDoradaCada: [8, 11],          // cada cuántos segundos aparece una (mínimo, máximo)
-  aroPos: 0.75,                      // el aro dorado está al 75 % del camino al nido
-  aroRadio: 58,
-  aroImpulsoDuracion: 4.5, aroImpulsoVel: 380, aroAprobar: 2,   // con 2 de 3 aciertos hay impulso
+  picadaVel: 340, picadaAcel: 900,
   termicaVel: 230,          // velocidad de subida gratis en el centro de una térmica
   energiaPasiva: 1.1,       // gasto por segundo solo por volar
   comerEnergia: 45, comerTiempo: 1.1,
   vistaCoste: 8, vistaDuracion: 3.4, vistaEspera: 9,
   invulnerable: 1.9,
+  imanRadio: 250, rafagaVel: 70, rafagaHund: 0.55, energiaPoder: 50,   // poderes
   vidas: 3,
   altitudBase: 3000, altitudPorPixel: 4.5, // para mostrar metros sobre el nivel del mar
+};
+
+
+/* ---------------------------------------------------------------------
+   PODERES: orbes brillantes que se recogen en el aire y ayudan a llegar al nido.
+   --------------------------------------------------------------------- */
+const PODERES = {
+  escudo:  { nombre: "Escudo del Apu",     dur: 8, color: "#6fd3ff", corto: "Te protege de cables, disparos y rayos (¡no del veneno!)" },
+  rafaga:  { nombre: "Corriente de cola",  dur: 6, color: "#8fe58a", corto: "Vuelas más rápido y caes más despacio" },
+  termica: { nombre: "Térmica portátil",   dur: 5, color: "#ffb25a", corto: "Una columna de aire caliente te sube gratis" },
+  iman:    { nombre: "Imán de plumas",     dur: 9, color: "#5fe0c8", corto: "Las plumas vuelan hacia ti" },
+  energia: { nombre: "Recarga de energía", dur: 0, color: "#ffe08a", corto: "Recuperas 50 de energía al instante" },
+};
+
+/* Cómo se llama cada forma de moverse (se muestra en el HUD). */
+const MODOS = {
+  aleteando: { texto: "Aleteando", ayuda: "Alas en movimiento: gasta energía" },
+  planeando: { texto: "Planeando", ayuda: "Alas abiertas y quietas: gratis y suma combo" },
+  termica:   { texto: "En térmica", ayuda: "Aire caliente: subes gratis" },
+  picada:    { texto: "En picada", ayuda: "Alas recogidas: bajas rápido" },
+  suelo:     { texto: "En el suelo", ayuda: "Despegar cuesta el triple" },
+  comiendo:  { texto: "Comiendo", ayuda: "Quieto: recuperas energía" },
 };
 
 /* Macho y hembra juegan distinto (dimorfismo real: el macho es más grande). */
@@ -120,8 +135,9 @@ const CONDORES = {
    --------------------------------------------------------------------- */
 const NIVELES = [
   { id: 1, semilla: 11, nombre: "Amanecer en el páramo",
-    intro: "Aprende a volar como un cóndor. Aletear cansa: busca las <strong>térmicas</strong> (columnas de aire caliente) y <strong>frena dentro de ellas</strong> para subir gratis. Baja en picada para comer <strong>carroña</strong> y limpiar el páramo. Al final te espera tu <strong>nido en el risco</strong>.",
-    nuevo: ["Térmicas", "Carroña", "Planeo", "Nido"],
+    intro: "Aprende a volar como un cóndor. Aletear cansa: busca las <strong>térmicas</strong> (columnas de aire caliente) y <strong>quédate dando vueltas dentro de ellas</strong> para subir gratis (con ← y → puedes ir y volver). Baja en picada para comer <strong>carroña</strong> y limpiar el páramo. Recoge los <strong>poderes</strong> brillantes: te ayudan a llegar a tu <strong>nido en el risco</strong>.",
+    nuevo: ["Térmicas", "Carroña", "Planeo", "Poderes", "Puntos de control", "Nido"],
+    poderes: ["energia", "termica", "iman", "rafaga"],
     largo: 7600, vel: 130,
     termicas: 8, carronas: 7, venenos: 0, cables: 0, cazadores: 0, tormentas: 0, plumasArcos: 7,
     cielo: ["#3e5a94", "#c98aa0", "#f9cf91"],
@@ -129,8 +145,9 @@ const NIVELES = [
     paleta: { lejos: [262, 26, 60], medio: [222, 30, 46], cerca: [152, 26, 38], suelo: [64, 40, 42], volcan: [236, 22, 50], nieve: [200, 40, 96] },
     clima: "amanecer", datoNido: "anidacion", pregunta: 0 },
   { id: 2, semilla: 29, nombre: "Cables en el valle",
-    intro: "Ahora hay personas cerca. Esquiva los <strong>tendidos eléctricos</strong> y usa la <strong>Vista de cóndor</strong> (tecla V): señala la carroña dudosa. La carroña <strong>envenenada es de color morado</strong>: ¡no la comas! Los gallinazos vuelan sobre la comida segura.",
-    nuevo: ["Cables", "Veneno", "Vista de cóndor", "Gallinazos"],
+    intro: "Ahora hay personas cerca. Esquiva los <strong>tendidos eléctricos</strong>. La carroña <strong>morada</strong> está <strong>envenenada</strong>: ¡no la comas! Los gallinazos vuelan sobre la comida segura y la <strong>Vista de cóndor</strong> (tecla V) la marca. Busca el <strong>Escudo del Apu</strong>.",
+    nuevo: ["Cables", "Carroña morada", "Vista de cóndor", "Escudo del Apu"],
+    poderes: ["escudo", "energia", "termica", "iman", "rafaga"],
     largo: 9200, vel: 140,
     termicas: 10, carronas: 8, venenos: 3, cables: 5, cazadores: 0, tormentas: 0, plumasArcos: 9,
     cielo: ["#3f7bc0", "#8cc1e6", "#e8f3f2"],
@@ -140,6 +157,7 @@ const NIVELES = [
   { id: 3, semilla: 47, nombre: "Cazadores en la quebrada",
     intro: "Al caer la tarde aparecen <strong>cazadores</strong> en el suelo. Cuando te apuntan, el láser se <strong>fija</strong> y el disparo sale un instante después: <strong>muévete antes del tiro</strong>. Los cables y el veneno siguen ahí.",
     nuevo: ["Cazadores", "Disparo con aviso", "Más veneno"],
+    poderes: ["escudo", "energia", "termica", "rafaga", "escudo", "iman"],
     largo: 10800, vel: 150,
     termicas: 12, carronas: 9, venenos: 3, cables: 4, cazadores: 5, tormentas: 0, plumasArcos: 10,
     cielo: ["#3b4a86", "#b3638c", "#f4a867"],
@@ -149,6 +167,7 @@ const NIVELES = [
   { id: 4, semilla: 83, nombre: "Tormenta sobre el Cotopaxi",
     intro: "Es temporada de cría: tu pareja cuida <strong>un solo huevo</strong>. Las <strong>tormentas</strong> empujan hacia abajo, gastan energía y lanzan <strong>rayos con aviso</strong>. Rodéalas por debajo o espera una térmica. Llega al nido con vida.",
     nuevo: ["Tormentas", "Rayos", "Huevo en el nido"],
+    poderes: ["escudo", "energia", "termica", "rafaga", "escudo", "energia", "iman"],
     largo: 12500, vel: 158,
     termicas: 14, carronas: 10, venenos: 4, cables: 4, cazadores: 4, tormentas: 4, plumasArcos: 11,
     cielo: ["#2a3341", "#4b5767", "#808c99"],
@@ -181,37 +200,6 @@ const PREGUNTAS = [
     fuente: FUENTES.plos },
 ];
 
-/* ---------------------------------------------------------------------
-   PLUMAS DORADAS: aparecen un momento y cruzan la pantalla. Al tocarlas muestran un dato real
-   y devuelven el 25 % de la energía. Cada una tiene su pregunta para el aro dorado.
-   --------------------------------------------------------------------- */
-const PLUMAS_DORADAS = [
-  { id: "pd-envergadura", titulo: "Alas gigantes",
-    texto: "Con las alas abiertas puede medir hasta 3,3 m. Es de las aves voladoras más grandes del mundo.",
-    pregunta: "¿Cuánto puede medir un cóndor con las alas abiertas?",
-    opciones: ["Cerca de 1 m", "Hasta 3,3 m", "Más de 6 m"], correcta: 1, fuente: FUENTES.wiki },
-  { id: "pd-peso", titulo: "Peso pesado",
-    texto: "Un cóndor pesa entre 10 y 15 kg. A diferencia de muchas rapaces, el macho es más grande que la hembra.",
-    pregunta: "¿Cuánto pesa aproximadamente un cóndor adulto?",
-    opciones: ["Entre 10 y 15 kg", "Menos de 1 kg", "Más de 60 kg"], correcta: 0, fuente: FUENTES.wiki },
-  { id: "pd-vida", titulo: "Una vida larga",
-    texto: "En la naturaleza un cóndor puede vivir más de 50 años.",
-    pregunta: "¿Cuántos años puede vivir un cóndor en la naturaleza?",
-    opciones: ["Unos 5 años", "Unos 15 años", "Más de 50 años"], correcta: 2, fuente: FUENTES.wiki },
-  { id: "pd-huevo", titulo: "Un solo huevo",
-    texto: "Una pareja pone normalmente un solo huevo cada dos años.",
-    pregunta: "¿Cada cuánto tiempo pone un huevo una pareja de cóndores?",
-    opciones: ["Cada dos años", "Cuatro por año", "Uno cada mes"], correcta: 0, fuente: FUENTES.wiki },
-  { id: "pd-simbolo", titulo: "Ave nacional",
-    texto: "El cóndor es el ave nacional del Ecuador y aparece en su escudo. Cada 7 de julio se celebra el Día del Cóndor Andino.",
-    pregunta: "¿Qué ave aparece en el escudo del Ecuador?",
-    opciones: ["El colibrí", "El cóndor andino", "El águila arpía"], correcta: 1, fuente: FUENTES.primicias },
-  { id: "pd-distancia", titulo: "Gran viajera",
-    texto: "Un cóndor silvestre puede recorrer más de 200 km en un solo día buscando comida.",
-    pregunta: "¿Cuánto puede recorrer un cóndor en un solo día?",
-    opciones: ["Menos de 5 km", "Unos 20 km", "Más de 200 km"], correcta: 2, fuente: FUENTES.wiki },
-];
-
 /* Logros: se guardan en el navegador. */
 const LOGROS = [
   { id: "primer_vuelo", titulo: "Primer vuelo", texto: "Llega al primer nido." },
@@ -223,7 +211,7 @@ const LOGROS = [
   { id: "coleccionista", titulo: "Enciclopedia completa", texto: "Descubre todos los datos del cóndor." },
   { id: "pareja", titulo: "Pareja de cóndores", texto: "Termina el juego con 2 jugadores." },
   { id: "guardian", titulo: "Guardián del cóndor", texto: "Llega al nido de los 4 niveles." },
-  { id: "aro_perfecto", titulo: "Aro dorado", texto: "Responde 3 de 3 en el quiz del aro dorado." },
+  { id: "poderoso", titulo: "Superpoderes", texto: "Recoge los 5 poderes distintos en una partida." },
   { id: "tres_estrellas", titulo: "Cumbre perfecta", texto: "Consigue 3 estrellas en un nivel." },
 ];
 
