@@ -436,3 +436,96 @@ p { margin: 0 0 12px; }
 /* marcas de puntos de control sobre la barra de progreso */
 .ruta .marcas u { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1px; background: #7380b8; }
 .ruta .marcas u.on { background: #ffd46e; box-shadow: 0 0 4px #ffd46e; }
+
+/* ---------- Distribución adaptativa: rama pruebas ---------- */
+.app {
+  width: 100%; max-width: none;
+  height: 100vh; height: 100dvh;
+  padding: clamp(6px, 1vw, 16px);
+  gap: clamp(6px, 1vh, 12px);
+}
+.hud, .pie, .girar { flex: 0 0 auto; }
+.escenario {
+  flex: 1 1 0; width: 100%; min-width: 0; min-height: 0;
+  aspect-ratio: auto; margin: 0;
+}
+#lienzo { width: 100%; height: 100%; object-fit: contain; }
+.hud.uno { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+.capa { display: block; padding: clamp(8px, 2vw, 24px); touch-action: pan-y; }
+.capa > .panel { max-height: none; overflow: visible; margin: 0 auto; }
+.capa.centro-menu { display: flex; align-items: safe center; justify-content: flex-end; }
+.capa.centro-menu > .panel {
+  margin: auto 0 auto auto; width: min(100%, 600px);
+  padding: clamp(16px, 2vw, 32px);
+}
+.titulo { font-size: clamp(2rem, 4vw, 3.5rem); }
+.capa > .panel.ancho { width: min(100%, 1000px); }
+.tabla { overflow-wrap: anywhere; }
+.visor { width: min(96vw, calc((96dvh - 80px) * 16 / 9)); }
+#visor-lienzo { object-fit: contain; }
+.avisos { z-index: 4; }
+.escenario:has(.capa:not([hidden]):not(:empty)) .tactil { display: none; }
+@media (max-width: 760px) {
+  .app { padding: 8px; }
+  .hud.uno { grid-template-columns: 1fr 1fr; }
+  .hud.uno .jug { grid-column: 1 / -1; }
+  .capa.centro-menu { justify-content: center; background: rgba(12,16,36,.65); }
+  .capa.centro-menu > .panel { margin: auto; }
+  .avisos { position: absolute; inset: 8px 8px auto 8px; width: auto; }
+  .tactil { position: absolute; inset: auto 6px 6px; }
+  .tactil .grupo { gap: 5px; }
+  .tactil button, .tactil button.grande { width: clamp(44px, 12vw, 64px); height: clamp(44px, 12vw, 64px); }
+  .rejilla-datos { grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .app { padding: 5px; }
+  .hud { width: calc(100% - 20px); }
+  .hud.uno { grid-template-columns: 1fr 2fr; }
+  .hud.uno .jug { grid-column: 1; }
+  .capa.centro-menu > .panel { padding: 12px 16px; }
+  .titulo { font-size: 1.8rem; }
+  .avisos { inset: 52px 8px auto auto; width: min(300px, 40%); }
+}
+.escenario { touch-action: auto; }
+#lienzo, .tactil button { touch-action: none; }
+
+/* ---------- Menú adaptable al espacio real del escenario ---------- */
+.capa.centro-menu {
+  container-type: size;
+  padding: clamp(8px, 1.4vw, 20px);
+  align-items: safe center;
+  overflow: auto;
+}
+.capa.centro-menu > .panel.menu {
+  flex: 0 0 auto;
+  width: min(100%, 680px);
+  padding: clamp(12px, 3.2cqh, 28px) clamp(14px, 2.5cqw, 30px);
+  line-height: 1.35;
+}
+.menu .titulo { font-size: clamp(1.65rem, 7.8cqh, 3.2rem); margin-bottom: clamp(6px, 1.4cqh, 12px); }
+.menu .lema { margin-bottom: 0; font-size: clamp(.88rem, 2.8cqh, 1rem); }
+.menu .ajustes { margin: clamp(8px, 2cqh, 16px) 0; gap: clamp(5px, 1.2cqh, 10px); }
+.menu .botones { gap: clamp(5px, 1.3cqh, 10px); grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.menu .botones .btn { grid-column: span 3; min-width: 0; min-height: 40px; padding: 9px 8px; line-height: 1.15; white-space: normal; }
+.menu .botones .principal { grid-column: 1 / -1; }
+.menu .botones .suave { grid-column: 1 / -1; }
+@container (min-width: 900px) {
+  .capa.centro-menu > .panel.menu { width: min(57%, 760px); }
+  .menu .botones .btn:not(.principal) { grid-column: span 2; }
+  .menu .botones .suave { grid-column: span 4; }
+}
+@container (min-width: 650px) and (max-height: 470px) {
+  .capa.centro-menu > .panel.menu { width: min(78%, 760px); padding: 10px 16px; }
+  .menu .titulo { font-size: clamp(1.4rem, 7cqh, 2rem); }
+  .menu .ajustes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 16px; margin: 8px 0; }
+  .menu .nota-ajuste { grid-column: 1 / -1; }
+  .menu .botones .btn:not(.principal) { grid-column: span 2; }
+  .menu .botones .suave { grid-column: span 4; }
+  .menu .botones .btn { min-height: 32px; padding: 7px; font-size: .88rem; }
+  .menu .seg { min-height: 32px; padding: 7px 10px; }
+}
+@container (max-width: 420px) {
+  .capa.centro-menu > .panel.menu { padding: 14px; }
+  .menu .botones .btn { font-size: .86rem; }
+  .menu .ajuste { gap: 5px; }
+}
