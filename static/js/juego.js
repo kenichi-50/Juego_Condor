@@ -128,7 +128,7 @@ const Juego = (() => {
         x: 260 - i * 70, y: 170 + i * 60, vx: N.vel, vy: 0, energia: c.energia, energiaMax: c.energia,
         vidas, vivo: true, suelo: false, espera: 0, comiendo: null, noComer: 0, invul: 0, fase: 0, amp: 0, aleteoT: 0,
         vistaEspera: 0, vistaT: 0, glideT: 0, mult: 1, puntos: 0, aleteoSeg: 0, tiempo: 0, danos: 0, rot: 0,
-        mordisco: 0, dir: 1, dirV: 1, dirS: 1, pod: { escudo: 0, rafaga: 0, termica: 0, iman: 0 }, vuelo: 1, spreadV: 1, modo: "planeando", avisoT: 0, avisoTxt: "", multPrev: 1, cv: null, llego: false, auto: false, enTermica: false, enTormenta: false, escala: c.escala,
+        mordisco: 0, dir: 1, dirV: 1, dirS: 1, pod: { escudo: 0, rafaga: 0, termica: 0, iman: 0 }, vuelo: 1, spreadV: 1, pasoFase: 0, pasoAmp: 0, modo: "planeando", avisoT: 0, avisoTxt: "", multPrev: 1, cv: null, llego: false, auto: false, enTermica: false, enTormenta: false, escala: c.escala,
       };
     });
   }
@@ -307,11 +307,14 @@ const Juego = (() => {
     p.vistaT = Math.max(0, p.vistaT - dt); p.noComer = Math.max(0, p.noComer - dt); p.tiempo += dt;
     for (const k in p.pod) p.pod[k] = Math.max(0, p.pod[k] - dt);
     p.avisoT = Math.max(0, p.avisoT - dt);
+
     animarAlas(p, dt);
-    actualizarPose(p, dt, e);
 
-    if (p.comiendo) { actualizarComer(p, e, dt); return; }
-
+    if (p.comiendo) {
+      actualizarComer(p, e, dt);
+      actualizarPose(p, dt, e);
+      return;
+    }
     // horizontal: ← y → llevan al cóndor a cada lado (en el aire y caminando). Sin tocar nada, sigue hacia donde mira.
     if (e.izq && !e.der) p.dir = -1; else if (e.der && !e.izq) p.dir = 1;
     const dir = p.dir;
@@ -321,9 +324,12 @@ const Juego = (() => {
     let vxObj = dir * vel;
     if (e.picada && !p.suelo) vxObj += 40 * dir;
     if (p.pod.rafaga > 0 && !p.suelo) vxObj += F.rafagaVel * dir;      // poder: viento a favor
-    if (p.suelo) vxObj = e.der ? 60 : e.izq ? -60 : 0;
+    if (p.suelo) {
+      vxObj = (Number(e.der) - Number(e.izq)) * F.caminataVel;
+    }
     p.dirV += (dir - p.dirV) * Math.min(1, dt * 9); p.dirS += (dir - p.dirS) * Math.min(1, dt * 3);
-    const acc = F.aceleracion * c.agil * dt;
+    const acc = (p.suelo ? F.caminataAcel : F.aceleracion)
+      * c.agil * dt;
     p.vx += clamp(vxObj - p.vx, -acc, acc);
 
     // térmicas: el aire mismo sube. Dentro de una, planear te eleva sin gastar energía.
@@ -336,8 +342,9 @@ const Juego = (() => {
       }
     }
     if (p.pod.termica > 0) aire = Math.min(aire, -F.termicaVel * 0.95);      // poder: térmica portátil
-    if ((p.enTermica || p.pod.termica > 0) && p.suelo && aire < -90) { p.suelo = false; p.y -= 3; p.vy = -40; }
-
+    if (p.suelo) {
+      p.enTermica = false;
+    }
     // vertical
     if (!p.suelo) {
       if (e.picada) p.vy = Math.min(F.picadaVel, p.vy + F.picadaAcel * dt);
@@ -374,7 +381,11 @@ const Juego = (() => {
     }
 
     // planeo: puntos extra mientras no aleteas
-    if (!p.suelo && p.aleteoT <= 0 && !e.aletear) p.glideT += dt; else if (e.aletear) p.glideT = 0;
+    if (!p.suelo && p.aleteoT <= 0 && !e.aletear) {
+      p.glideT += dt;
+    } else if (e.aletear || p.suelo) {
+      p.glideT = 0;
+    }
     p.mult = 1 + Math.min(4, Math.floor(p.glideT / 2.5));
     if (p.mult > p.multPrev) { p.avisoT = 1.3; p.avisoTxt = "Planeo ×" + p.mult; }
     p.multPrev = p.mult;
@@ -382,6 +393,7 @@ const Juego = (() => {
     recoger(p, dt);
     if (p.pod.termica > 0 && Math.random() < dt * 16) emitir(p.x + (Math.random() - 0.5) * 60, p.y + 34, 1, ["#ffb25a", "#ffd9a0"], { ang: -Math.PI / 2, abre: 0.6, vel: 90, g: -30, tam: 4, vida: 0.7 });
     if (p.pod.rafaga > 0 && Math.random() < dt * 22) emitir(p.x - 40, p.y + (Math.random() - 0.5) * 50, 1, ["#8fe58a", "#d4ffcf"], { ang: Math.PI, abre: 0.3, vel: 160, g: 0, tam: 3.5, vida: 0.45 });
+    actualizarPose(p, dt, e);
     if (p.energia <= 0 && !p.suelo) tip("sinEnergia", "Sin energía: planea y baja a comer carroña.");
   }
 
@@ -445,7 +457,9 @@ const Juego = (() => {
   function actualizarPose(p, dt, e) {
     let modo;
     if (p.comiendo) modo = "comiendo";
-    else if (p.suelo) modo = "suelo";
+    else if (p.suelo) {
+      modo = Math.abs(p.vx) > 3 ? "caminando" : "suelo";
+    }
     else if (e.picada) modo = "picada";
     else if (p.aleteoT > 0) modo = "aleteando";
     else if (p.enTermica || p.pod.termica > 0) modo = "termica";
@@ -456,7 +470,25 @@ const Juego = (() => {
       if (modo === "planeando" && p.modo === "aleteando") tip("mPla", "Planeando: alas abiertas y quietas. ¡Es gratis y suma combo de puntos!");
       p.modo = modo;
     }
-    const enAire = modo !== "suelo" && modo !== "comiendo";
+    const enAire = !p.suelo && modo !== "comiendo";
+
+    const intensidad = modo === "caminando"
+      ? clamp(Math.abs(p.vx) / FISICA.caminataVel, 0, 1)
+      : 0;
+
+    p.pasoAmp += (intensidad - p.pasoAmp)
+      * Math.min(1, dt * 12);
+
+    if (intensidad > 0) {
+      p.pasoFase += dt * Math.PI
+        * FISICA.caminataPasos * intensidad;
+
+      p.pasoFase %= TAU;
+    }
+
+    if (enAire || p.comiendo) {
+      p.pasoAmp = 0;
+    }
     p.vuelo += ((enAire ? 1 : 0) - p.vuelo) * Math.min(1, dt * 7);
     const sp = modo === "picada" ? 0.12 : enAire ? 1 : 0;
     p.spreadV += (sp - p.spreadV) * Math.min(1, dt * (modo === "picada" ? 10 : 6));
@@ -484,6 +516,8 @@ const Juego = (() => {
     p.vivo = true; p.vidas = vidas; p.x = c.x - 30 * p.id; p.y = Math.min(210, M.suelo(c.x) - 120); p.vx = N.vel; p.vy = 0;
     p.suelo = false; p.comiendo = null; p.invul = 2.5; p.energia = Math.max(p.energia, p.energiaMax * 0.6); p.auto = false; p.llego = false;
     p.dir = 1; p.dirV = 1; p.dirS = 1; p.rot = 0; p.vuelo = 1; p.spreadV = 1; p.glideT = 0;
+    p.pasoFase = 0;
+    p.pasoAmp = 0;
     for (const k in p.pod) p.pod[k] = 0;
   }
   function activarControl(c) {
@@ -722,9 +756,18 @@ const Juego = (() => {
     if (!h.cv) { h.cv = document.createElement("canvas"); h.cv.width = SPW * dpr; h.cv.height = SPH * dpr; h.c2 = h.cv.getContext("2d"); }
     const c2 = h.c2, v = o.vuelo;
     c2.setTransform(dpr, 0, 0, dpr, 0, 0); c2.clearRect(0, 0, SPW, SPH);
-    Condor3D.sprite(c2, { macho: o.macho, spread: o.spread, psi: o.psi, rx: v * 0.9, yaw: lerp(-1.5, -2.3, v), pitch: lerp(0.12, 0.75, v),
+    Condor3D.sprite(c2, { pasoFase: o.pasoFase, pasoAmp: o.pasoAmp, macho: o.macho, spread: o.spread, psi: o.psi, rx: v * 0.9, yaw: lerp(-1.5, -2.3, v), pitch: lerp(0.12, 0.75, v),
       dist: 6, f: 432, cx: SPW / 2, cy: SPH / 2, t: o.t, nod: o.nod, look: o.look, tilt: o.tilt });
-    ctx.save(); ctx.translate(x, y - (1 - v) * (0.85 * 72 * (o.macho ? 1 : 0.9) - 18)); ctx.scale(o.dir === undefined ? 1 : o.dir, 1); ctx.rotate(o.ang || 0);
+    ctx.save();
+    const balanceo = (o.pasoAmp || 0)
+      * (1 - Math.cos(2 * (o.pasoFase || 0)))
+      * 1.5;
+
+    const altura = (1 - v)
+      * (0.85 * 72 * (o.macho ? 1 : 0.9) - 18);
+
+    ctx.translate(x, y - altura - balanceo);
+    ctx.scale(o.dir === undefined ? 1 : o.dir, 1); ctx.rotate(o.ang || 0);
     ctx.globalAlpha = o.alpha === undefined ? 1 : o.alpha; ctx.drawImage(h.cv, -SPW / 2, -SPH / 2, SPW, SPH); ctx.restore();
   }
   function estelaPlaneo(x, y, p, T) {       // líneas de viento: solo aparecen al planear
@@ -744,9 +787,13 @@ const Juego = (() => {
     if (!p.vivo) alpha = 0.85; else if (p.invul > 0 && p.invul < 90 && Math.floor(T * 14) % 2 && p.pod.escudo <= 0) alpha = 0.35;
     if (jugadores.length === 2 && p.vivo) LP.tri(ctx, x - 7, y - 74, x + 7, y - 74, x, y - 62, p.id === 0 ? "#ffcf55" : "#6fd3ff");
     if (p.vivo && (p.modo === "planeando" || p.modo === "termica") && p.vuelo > 0.6) estelaPlaneo(x, y, p, T);
-    const flap = p.aleteoT > 0 ? 0.8 * p.amp * Math.sin(p.fase) : 0.05 * Math.sin(T * 1.6) * p.spreadV;
+    const flap = p.suelo
+      ? 0
+      : p.aleteoT > 0
+        ? 0.8 * p.amp * Math.sin(p.fase)
+        : 0.05 * Math.sin(T * 1.6) * p.spreadV;
     const nod = p.comiendo ? 0.95 + 0.12 * Math.sin(T * 14) : p.modo === "picada" ? 0.12 : -0.05 + 0.04 * Math.sin(T * 1.7);
-    trazarCondor(p, x, y, { macho: p.macho, vuelo: p.vivo ? p.vuelo : 1, spread: p.vivo ? p.spreadV : 0.35, psi: p.vivo ? flap : 0,
+    trazarCondor(p, x, y, { pasoFase: p.pasoFase, pasoAmp: p.vivo && p.suelo ? p.pasoAmp : 0, macho: p.macho, vuelo: p.vivo ? p.vuelo : 1, spread: p.vivo ? p.spreadV : 0.35, psi: p.vivo ? flap : 0,
       dir: p.vivo ? p.dirV : 1, nod: p.vivo ? nod : 0, look: 0.05 * Math.sin(T * 0.8), tilt: 0.04 * Math.sin(T * 1.3), t: T, alpha,
       ang: p.vivo ? clamp(p.vy * 0.0016, -0.3, 0.45) * p.vuelo : p.rot });
     if (p.vivo && p.pod.iman > 0) {   // anillo del imán de plumas

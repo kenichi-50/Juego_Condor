@@ -90,6 +90,12 @@ const FISICA = {
   aleteoEspera: 0.24,       // segundos entre aleteos
   despegueMultiplicador: 3, // despegar del suelo cuesta el triple (dato real)
   velMin: 70, velMax: 250, aceleracion: 280,
+
+  //Parametros de caminata
+  caminataVel: 60,
+  caminataAcel: 180,
+  caminataPasos: 2.5,
+
   picadaVel: 340, picadaAcel: 900,
   termicaVel: 230,          // velocidad de subida gratis en el centro de una térmica
   energiaPasiva: 1.1,       // gasto por segundo solo por volar
@@ -119,7 +125,8 @@ const MODOS = {
   planeando: { texto: "Planeando", ayuda: "Alas abiertas y quietas: gratis y suma combo" },
   termica:   { texto: "En térmica", ayuda: "Aire caliente: subes gratis" },
   picada:    { texto: "En picada", ayuda: "Alas recogidas: bajas rápido" },
-  suelo:     { texto: "En el suelo", ayuda: "Despegar cuesta el triple" },
+  suelo:     { texto: "En reposo", ayuda: "Despegar cuesta el triple" },
+  caminando: { texto: "Caminando", ayuda: "Usa izquierda y derecha para caminar" },
   comiendo:  { texto: "Comiendo", ayuda: "Quieto: recuperas energía" },
 };
 

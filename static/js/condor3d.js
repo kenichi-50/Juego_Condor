@@ -203,6 +203,7 @@ const Condor3D = (() => {
     // patas parecidas a las de una gallina
     [-1, 1].forEach((sg, q) => {
       const x = sg * 0.15;
+      const inicio = out.length;
       tronco(out, [x, 0.36, 0.05], [x, 0.05, 0.14], 0.036, 0.032, 6, PAL.pata, "patas", 70 + q);
       [[-0.09, 0.4], [0, 0.45], [0.09, 0.4]].forEach(([dx, dz], t) => {
         const fin = [x + dx, 0.025, dz];
@@ -210,6 +211,9 @@ const Condor3D = (() => {
         tronco(out, fin, add(fin, [dx * 0.4, -0.02, 0.08]), 0.017, 0.0, 5, PAL.garra, "patas", 90 + t);
       });
       tronco(out, [x, 0.05, 0.13], [x, 0.025, -0.06], 0.022, 0.014, 5, PAL.pata, "patas", 100 + q);
+      for (let i = inicio; i < out.length; i++) {
+        out[i].ladoPata = sg;
+      }
     });
     return out;
   }
@@ -395,6 +399,50 @@ const Condor3D = (() => {
      para que se vea sobre cualquier paisaje. Lo usa juego.js en cada fotograma.
      o: {macho, spread (0 plegadas, 1 abiertas), psi (aleteo), rx (cuerpo horizontal),
          yaw, pitch, dist, f, cx, cy, t, nod, look, tilt, blink} */
+
+  function poseCaminata(tris, fase, intensidad) {
+
+    if (!intensidad) return tris;
+
+    const poses = new Map();
+
+    for (const lado of [-1, 1]) {
+
+      const ciclo = fase + (lado === 1 ? Math.PI : 0);
+
+      const ang = Math.sin(ciclo) * 0.48 * intensidad;
+
+      const giro = mover(["rx", ang]);
+
+      const pivote = [lado * 0.15, 0.36, 0.05];
+
+      const elevar = Math.max(0, Math.cos(ciclo))
+        * 0.085 * intensidad;
+
+      poses.set(lado, (v) => {
+
+        const a = add(pivote, giro(sub(v, pivote)));
+
+        a[1] += elevar
+          * clamp((0.36 - v[1]) / 0.36, 0, 1);
+
+        return a;
+      });
+    }
+
+    return tris.map((t) => {
+
+      const f = poses.get(t.ladoPata);
+
+      return f
+        ? {
+            ...t,
+            p: t.p.map(f),
+            o: t.o ? f(t.o) : null
+          }
+        : t;
+    });
+  }
   function sprite(c2, o) {
     const macho = o.macho, e = macho ? 1 : 0.9;
     const g = { e, dy: 0, rx: o.rx || 0, cx: o.cx, cy: o.cy, f: o.f, cam: { yaw: o.yaw, pitch: o.pitch, dist: o.dist, tx: 0, ty: 0.85 * e, tz: 0 } };
@@ -402,7 +450,16 @@ const Condor3D = (() => {
     const alas = [], anc = {};
     construirAla(alas, 1, o.spread, o.psi || 0, "adulto", anc, o.rx || 0); construirAla(alas, -1, o.spread, o.psi || 0, "adulto", anc, o.rx || 0);
     const items = [], gAlas = Object.assign({}, g, { rx: 0 });
-    agregar(items, fijo(macho, "adulto"), g, null, 0); agregar(items, cab, g, null, 0); agregar(items, alas, gAlas, null, 0);
+    const modelo = fijo(macho, "adulto");
+
+    const modeloAnimado = poseCaminata(
+      modelo,
+      o.pasoFase || 0,
+      o.pasoAmp || 0
+    );
+
+    agregar(items, modeloAnimado, g, null, 0);agregar(items, cab, g, null, 0); agregar(items, alas, gAlas, null, 0);
+    
     items.sort((a, b) => b.k - a.k);
     c2.save(); c2.lineJoin = "round";
     const trazo = (it) => { c2.beginPath(); c2.moveTo(it.A[0], it.A[1]); c2.lineTo(it.B[0], it.B[1]); c2.lineTo(it.C[0], it.C[1]); c2.closePath(); };
