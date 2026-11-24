@@ -96,6 +96,12 @@ const FISICA = {
   caminataAcel: 180,
   caminataPasos: 2.5,
 
+  // Parametros de aterrizaje y despegue
+  aterrizajeTiempo: 0.45,
+  despegueTiempo: 0.55,
+  aterrizajeDistancia: 65,
+  aterrizajeVelocidad: 110,
+
   picadaVel: 340, picadaAcel: 900,
   termicaVel: 230,          // velocidad de subida gratis en el centro de una térmica
   energiaPasiva: 1.1,       // gasto por segundo solo por volar
@@ -128,6 +134,8 @@ const MODOS = {
   suelo:     { texto: "En reposo", ayuda: "Despegar cuesta el triple" },
   caminando: { texto: "Caminando", ayuda: "Usa izquierda y derecha para caminar" },
   comiendo:  { texto: "Comiendo", ayuda: "Quieto: recuperas energía" },
+  aterrizando: { texto: "Aterrizando", ayuda: "Reduce la velocidad y prepara las patas"},
+  despegando: {texto: "Despegando", ayuda: "Extiende las alas para elevarse"},
 };
 
 /* Macho y hembra juegan distinto (dimorfismo real: el macho es más grande). */

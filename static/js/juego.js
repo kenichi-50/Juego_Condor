@@ -128,7 +128,8 @@ const Juego = (() => {
         x: 260 - i * 70, y: 170 + i * 60, vx: N.vel, vy: 0, energia: c.energia, energiaMax: c.energia,
         vidas, vivo: true, suelo: false, espera: 0, comiendo: null, noComer: 0, invul: 0, fase: 0, amp: 0, aleteoT: 0,
         vistaEspera: 0, vistaT: 0, glideT: 0, mult: 1, puntos: 0, aleteoSeg: 0, tiempo: 0, danos: 0, rot: 0,
-        mordisco: 0, dir: 1, dirV: 1, dirS: 1, pod: { escudo: 0, rafaga: 0, termica: 0, iman: 0 }, vuelo: 1, spreadV: 1, pasoFase: 0, pasoAmp: 0, modo: "planeando", avisoT: 0, avisoTxt: "", multPrev: 1, cv: null, llego: false, auto: false, enTermica: false, enTormenta: false, escala: c.escala,
+        mordisco: 0, dir: 1, dirV: 1, dirS: 1, pod: { escudo: 0, rafaga: 0, termica: 0, iman: 0 }, vuelo: 1, spreadV: 1, pasoFase: 0, pasoAmp: 0, aterrizajeT: 0, despegueT: 0, 
+        modo: "planeando", avisoT: 0, avisoTxt: "", multPrev: 1, cv: null, llego: false, auto: false, enTermica: false, enTormenta: false, escala: c.escala,
       };
     });
   }
@@ -247,8 +248,16 @@ const Juego = (() => {
     p.energia = Math.max(0, p.energia - F.aleteoCoste * c.coste * (desdeSuelo ? F.despegueMultiplicador : 1));
     p.vy = -F.aleteoImpulso * (desdeSuelo ? 1.12 : 1) * (0.92 + 0.1 * c.agil);
     p.espera = F.aleteoEspera; p.aleteoT = 0.42; p.glideT = 0;
+
     if (desdeSuelo) {
-      p.suelo = false; p.y -= 4;
+      p.suelo = false;
+      p.y -= 4;
+
+      p.despegueT = F.despegueTiempo;
+      p.aterrizajeT = 0;
+
+      p.pasoAmp = 0;
+      p.pasoFase = 0;
       emitir(p.x, p.y + 16, 8, ["#b69a6a", "#d2b98a"], { ang: -Math.PI / 2, abre: 2.4, vel: 70, tam: 3.5 });
       mostrarDato("despegue");
     } else emitir(p.x - 10, p.y + 8, 2, ["rgba(255,255,255,.7)"], { ang: Math.PI * 0.6, abre: 0.8, vel: 50, g: 0, tam: 3, vida: 0.4 });
@@ -307,6 +316,8 @@ const Juego = (() => {
     p.vistaT = Math.max(0, p.vistaT - dt); p.noComer = Math.max(0, p.noComer - dt); p.tiempo += dt;
     for (const k in p.pod) p.pod[k] = Math.max(0, p.pod[k] - dt);
     p.avisoT = Math.max(0, p.avisoT - dt);
+    p.aterrizajeT = Math.max(0, p.aterrizajeT - dt);
+    p.despegueT = Math.max(0, p.despegueT - dt);
 
     animarAlas(p, dt);
 
@@ -377,7 +388,15 @@ const Juego = (() => {
     if (p.suelo) { p.y = piso; p.vy = 0; }
     else if (p.y >= piso && p.vy >= 0) {
       if (p.vy > 260) { p.energia = Math.max(0, p.energia - 4); emitir(p.x, p.y + 16, 8, ["#b69a6a", "#d2b98a"], { vel: 90, tam: 3.5 }); }
-      p.y = piso; p.vy = 0; p.suelo = true; p.vx *= 0.4;
+      p.y = piso;
+      p.vy = 0;
+      p.suelo = true;
+      p.vx *= 0.4;
+
+      p.aterrizajeT = F.aterrizajeTiempo;
+      p.despegueT = 0;
+      p.aleteoT = 0;
+      p.amp = 0;
     }
 
     // planeo: puntos extra mientras no aleteas
@@ -456,16 +475,37 @@ const Juego = (() => {
      Aleteando = alas en movimiento. Planeando = alas abiertas y quietas. */
   function actualizarPose(p, dt, e) {
     let modo;
-    if (p.comiendo) modo = "comiendo";
-    else if (p.suelo) {
+
+    const distanciaSuelo = M.suelo(p.x) - 18 - p.y;
+
+    const preparandoAterrizaje =
+      !p.suelo &&
+      !e.aletear &&
+      !e.picada &&
+      p.vy > 0 &&
+      p.vy <= FISICA.aterrizajeVelocidad &&
+      distanciaSuelo >= 0 &&
+      distanciaSuelo <= FISICA.aterrizajeDistancia;
+    
+    if (p.comiendo) {
+      modo = "comiendo";
+    } else if (p.despegueT > 0 && !p.suelo) {
+      modo = "despegando";
+    } else if (p.aterrizajeT > 0 || preparandoAterrizaje) {
+      modo = "aterrizando";
+    } else if (p.suelo) {
       modo = Math.abs(p.vx) > 3 ? "caminando" : "suelo";
+    } else if (e.picada) {
+      modo = "picada";
+    } else if (p.aleteoT > 0) {
+      modo = "aleteando";
+    } else if (p.enTermica || p.pod.termica > 0) {
+      modo = "termica";
+    } else {
+      modo = "planeando";
     }
-    else if (e.picada) modo = "picada";
-    else if (p.aleteoT > 0) modo = "aleteando";
-    else if (p.enTermica || p.pod.termica > 0) modo = "termica";
-    else modo = "planeando";
     if (modo !== p.modo) {
-      if (modo === "aleteando" || modo === "planeando" || modo === "termica" || modo === "picada") { p.avisoT = 1.3; p.avisoTxt = MODOS[modo].texto; }
+      if (modo === "aleteando" || modo === "planeando" || modo === "termica" || modo === "picada" || modo === "aterrizando" || modo === "despegando") {p.avisoT = 1.3; p.avisoTxt = MODOS[modo].texto;}
       if (modo === "aleteando") tip("mAle", "Aleteando: las alas se mueven y gastas energía. Suelta ↑ para planear gratis.");
       if (modo === "planeando" && p.modo === "aleteando") tip("mPla", "Planeando: alas abiertas y quietas. ¡Es gratis y suma combo de puntos!");
       p.modo = modo;
@@ -489,9 +529,28 @@ const Juego = (() => {
     if (enAire || p.comiendo) {
       p.pasoAmp = 0;
     }
-    p.vuelo += ((enAire ? 1 : 0) - p.vuelo) * Math.min(1, dt * 7);
-    const sp = modo === "picada" ? 0.12 : enAire ? 1 : 0;
-    p.spreadV += (sp - p.spreadV) * Math.min(1, dt * (modo === "picada" ? 10 : 6));
+    let vueloObjetivo = enAire ? 1 : 0;
+    let alasObjetivo = enAire ? 1 : 0;
+
+    if (modo === "picada") {
+      alasObjetivo = 0.12;
+    }
+
+    if (modo === "aterrizando") {
+      vueloObjetivo = p.suelo ? 0 : 0.35;
+      alasObjetivo = p.suelo ? 0 : 0.65;
+    }
+
+    if (modo === "despegando") {
+      vueloObjetivo = 1;
+      alasObjetivo = 1;
+    }
+
+    p.vuelo += (vueloObjetivo - p.vuelo)
+      * Math.min(1, dt * 7);
+
+    p.spreadV += (alasObjetivo - p.spreadV)
+      * Math.min(1, dt * 8);
   }
 
   /* ---------- Llegada al nido ---------- */
@@ -518,6 +577,8 @@ const Juego = (() => {
     p.dir = 1; p.dirV = 1; p.dirS = 1; p.rot = 0; p.vuelo = 1; p.spreadV = 1; p.glideT = 0;
     p.pasoFase = 0;
     p.pasoAmp = 0;
+    p.aterrizajeT = 0;
+    p.despegueT = 0;
     for (const k in p.pod) p.pod[k] = 0;
   }
   function activarControl(c) {
@@ -780,7 +841,14 @@ const Juego = (() => {
     });
     ctx.restore();
   }
-  const COLOR_MODO = { aleteando: "#ffb06a", planeando: "#9fe3ff", termica: "#ffd46e", picada: "#ff8a7a" };
+  const COLOR_MODO = {
+    aleteando: "#ffb06a",
+    planeando: "#9fe3ff",
+    termica: "#ffd46e",
+    picada: "#ff8a7a",
+    aterrizando: "#a8e6a3",
+    despegando: "#ffe08a"
+  };
   function dibujarJugador(p, T) {
     const x = p.x - cam, y = p.y;
     let alpha = 1;
