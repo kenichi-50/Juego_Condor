@@ -4,7 +4,6 @@
    No contiene lógica de vuelo: solo muestra cosas y avisa a Juego.
    ===================================================================== */
 
-/* ---------- Almacenamiento en el navegador ---------- */
 const Almacen = (() => {
   const leer = (k, def) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch { return def; } };
   const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sin almacenamiento */ } };
@@ -16,12 +15,11 @@ const Almacen = (() => {
     get logros() { return logros; },
     descubrir(id) { if (datos.has(id)) return false; datos.add(id); guardar("gdc.datos", [...datos]); return true; },
     otorgar(id) { if (logros.has(id)) return false; logros.add(id); guardar("gdc.logros", [...logros]); return true; },
-    prefs: leer("gdc.prefs", { jugadores: 1, sexo: "macho", nombre: "" }),
+    prefs: leer("gdc.prefs", { jugadores: 1, sexo: "macho", nombre: "", accesorio: "ninguno" }),
     guardarPrefs(p) { Object.assign(this.prefs, p); guardar("gdc.prefs", this.prefs); },
   };
 })();
 
-/* ---------- API de puntajes (Flask) con respaldo local ---------- */
 const Api = (() => {
   const URL = "api/puntajes";
   const local = () => Almacen.leer("gdc.puntajes", []);
@@ -57,7 +55,6 @@ const UI = (() => {
 
   let filtroTema = "Todos";
 
-  /* ---------- Capa de pantallas ---------- */
   function mostrar(html, clase = "") {
     capa.className = "capa " + clase; capa.innerHTML = html; capa.hidden = false;
     const f = capa.querySelector("[data-foco]") || capa.querySelector("button, input");
@@ -67,9 +64,8 @@ const UI = (() => {
   function ocultar() { capa.hidden = true; capa.innerHTML = ""; }
   const visible = () => !capa.hidden;
 
-  /* ---------- Pantallas ---------- */
   function menu() {
-    const p = Almacen.prefs, otro = p.sexo === "macho" ? "hembra" : "macho";
+    const p = Almacen.prefs, otro = p.sexo === "macho" ? "hembra" : "macho", acc = p.accesorio || "ninguno";
     const seg = (accion, valor, actual, texto) =>
       `<button type="button" class="seg ${String(actual) === String(valor) ? "activo" : ""}" data-accion="${accion}" data-v="${valor}" aria-pressed="${String(actual) === String(valor)}">${texto}</button>`;
     mostrar(`
@@ -79,6 +75,7 @@ const UI = (() => {
         <div class="ajustes">
           <div class="ajuste"><span class="etq">Jugadores</span><div class="grupo-seg">${seg("jugadores", 1, p.jugadores, "1")}${seg("jugadores", 2, p.jugadores, "2")}</div></div>
           <div class="ajuste"><span class="etq">${p.jugadores === 2 ? "Jugador 1" : "Tu cóndor"}</span><div class="grupo-seg">${seg("sexo", "macho", p.sexo, "Macho")}${seg("sexo", "hembra", p.sexo, "Hembra")}</div></div>
+          <div class="ajuste"><span class="etq">Accesorio cabeza</span><div class="grupo-seg">${seg("accesorio", "ninguno", acc, "Ninguno")}${seg("accesorio", "chullo", acc, "Chullo")}${seg("accesorio", "sombrero", acc, "Sombrero")}</div></div>
           <p class="nota-ajuste">${esc(CONDORES[p.sexo].detalle)}${p.jugadores === 2 ? ` El jugador 2 será ${otro === "macho" ? "el macho" : "la hembra"}.` : ""}</p>
         </div>
         <div class="botones">
@@ -291,7 +288,6 @@ const UI = (() => {
     });
   }
 
-  /* ---------- HUD ---------- */
   const hud = $("hud");
   const gemas = (n, max) => Array.from({ length: max }, (_, i) => `<i class="gema ${i < n ? "" : "perdida"}"></i>`).join("");
   function hudVisible(v) { hud.classList.toggle("oculto", !v); }
@@ -327,7 +323,6 @@ const UI = (() => {
     hud.classList.toggle("uno", s.jugadores.length < 2);
   }
 
-  /* ---------- Avisos ---------- */
   function toast(clase, html, ms = 7000) {
     const el = document.createElement("div"); el.className = "toast " + clase; el.innerHTML = html;
     toasts.appendChild(el);
@@ -347,7 +342,6 @@ const UI = (() => {
   }
   function limpiarAvisos() { toasts.innerHTML = ""; consejoEl.hidden = true; }
 
-  /* ---------- Clics de las pantallas (delegación de eventos) ---------- */
   capa.addEventListener("click", (e) => {
     const b = e.target.closest("[data-accion]"); if (!b || b.disabled) return;
     SND.iniciar(); SND.play("clic");
@@ -355,6 +349,13 @@ const UI = (() => {
     switch (a) {
       case "jugadores": Almacen.guardarPrefs({ jugadores: Number(b.dataset.v) }); menu(); break;
       case "sexo": Almacen.guardarPrefs({ sexo: b.dataset.v }); menu(); Condor3D.abrir(b.dataset.v); break;
+      case "accesorio": {
+        const valor = b.dataset.v;
+        Almacen.guardarPrefs({ accesorio: valor });
+        if (Condor3D && Condor3D.setAccesorio) Condor3D.setAccesorio(valor);
+        menu();
+        break;
+      }
       case "jugar": Juego.nuevaPartida(); break;
       case "ayuda": ayuda(); break;
       case "enciclopedia": filtroTema = "Todos"; enciclopedia(); break;
