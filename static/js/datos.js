@@ -104,7 +104,18 @@ const FISICA = {
 
   picadaVel: 340, picadaAcel: 900,
   termicaVel: 230,          // velocidad de subida gratis en el centro de una térmica
-  energiaPasiva: 1.1,       // gasto por segundo solo por volar
+  
+  // Consumo de energia por segundo
+  energiaPasiva: 1.1,
+  energiaReposo: 0.2,
+  energiaCaminata: 0.5,
+  energiaTermica: 0.4,
+  energiaTormenta: 3.0,
+
+  // Umbrales de energia
+  energiaBaja: 0.20,
+  energiaCritica: 0.10,
+
   comerEnergia: 45, comerTiempo: 1.1,
   vistaCoste: 8, vistaDuracion: 3.4, vistaEspera: 9,
   invulnerable: 1.9,
@@ -128,14 +139,15 @@ const PODERES = {
 /* Cómo se llama cada forma de moverse (se muestra en el HUD). */
 const MODOS = {
   aleteando: { texto: "Aleteando", ayuda: "Alas en movimiento: gasta energía" },
-  planeando: { texto: "Planeando", ayuda: "Alas abiertas y quietas: gratis y suma combo" },
-  termica:   { texto: "En térmica", ayuda: "Aire caliente: subes gratis" },
+  planeando: { texto: "Planeando", ayuda: "Bajo consumo de energia y suma combo" },
+  termica:   { texto: "En térmica", ayuda: "Subes aprovechando el aire caliente" },
   picada:    { texto: "En picada", ayuda: "Alas recogidas: bajas rápido" },
   suelo:     { texto: "En reposo", ayuda: "Despegar cuesta el triple" },
   caminando: { texto: "Caminando", ayuda: "Usa izquierda y derecha para caminar" },
   comiendo:  { texto: "Comiendo", ayuda: "Quieto: recuperas energía" },
   aterrizando: { texto: "Aterrizando", ayuda: "Reduce la velocidad y prepara las patas"},
   despegando: {texto: "Despegando", ayuda: "Extiende las alas para elevarse"},
+  muerto: {texto: "Sin vida", ayuda: "El condor no puede continuar"},
 };
 
 /* Macho y hembra juegan distinto (dimorfismo real: el macho es más grande). */

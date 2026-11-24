@@ -109,7 +109,7 @@ const Juego = (() => {
       topMedio: (i) => 432 - 92 * (0.4 * LP.hash(i, 2, n.semilla + 2) + 0.6 * (0.5 + 0.5 * Math.sin(i * 0.8 + n.semilla * 2))),
       topCerca: (i) => 458 - 60 * (0.4 * LP.hash(i, 3, n.semilla + 3) + 0.6 * (0.5 + 0.5 * Math.sin(i * 1.1 + n.semilla * 3))),
       tips: new Set(), datosVistos: new Set(), datosNuevos: 0, limpias: 0, plumasTomadas: 0, vistaT: 0,
-      seguras: carronas.filter((c) => !c.venenosa).length, tiempo: 0, llegadaT: 0, correcta: false, quizBonus: 0,
+      seguras: carronas.filter((c) => !c.venenosa).length, tiempo: 0, llegadaT: 0, finT: 0, correcta: false, quizBonus: 0,
     };
     return mundo;
   }
@@ -126,10 +126,10 @@ const Juego = (() => {
       return {
         id: i, sexo, macho: sexo === "macho", nombre: dos ? `Jugador ${i + 1}` : `Cóndor ${sexo}`,
         x: 260 - i * 70, y: 170 + i * 60, vx: N.vel, vy: 0, energia: c.energia, energiaMax: c.energia,
-        vidas, vivo: true, suelo: false, espera: 0, comiendo: null, noComer: 0, invul: 0, fase: 0, amp: 0, aleteoT: 0,
+        vidas, vivo: vidas > 0, suelo: false, espera: 0, comiendo: null, noComer: 0, invul: 0, fase: 0, amp: 0, aleteoT: 0,
         vistaEspera: 0, vistaT: 0, glideT: 0, mult: 1, puntos: 0, aleteoSeg: 0, tiempo: 0, danos: 0, rot: 0,
         mordisco: 0, dir: 1, dirV: 1, dirS: 1, pod: { escudo: 0, rafaga: 0, termica: 0, iman: 0 }, vuelo: 1, spreadV: 1, pasoFase: 0, pasoAmp: 0, aterrizajeT: 0, despegueT: 0, 
-        modo: "planeando", avisoT: 0, avisoTxt: "", multPrev: 1, cv: null, llego: false, auto: false, enTermica: false, enTormenta: false, escala: c.escala,
+        causaMuerte: null, energiaAlerta: 0, modo: "planeando", avisoT: 0, avisoTxt: "", multPrev: 1, cv: null, llego: false, auto: false, enTermica: false, enTormenta: false, escala: c.escala,
       };
     });
   }
@@ -208,6 +208,50 @@ const Juego = (() => {
   const vivos = () => jugadores.filter((p) => p.vivo);
   const puntosTotales = () => (partida ? partida.puntos : 0) + jugadores.reduce((s, p) => s + p.puntos, 0);
 
+  function morir(p, causa) {
+
+    if (!p.vivo) return;
+
+    if (p.comiendo) {
+      p.comiendo.obj.estado = 0;
+      p.comiendo.obj.por = null;
+      p.comiendo = null;
+    }
+
+    p.vivo = false;
+    p.vidas = 0;
+    p.causaMuerte = causa;
+    p.modo = "muerto";
+
+    p.vy = p.suelo ? 0 : -80;
+    p.vx *= 0.3;
+
+    p.invul = 0;
+    p.aleteoT = 0;
+    p.amp = 0;
+    p.pasoAmp = 0;
+    p.glideT = 0;
+    p.mult = 1;
+    p.auto = false;
+    p.vistaT = 0;
+
+    for (const k in p.pod) {
+      p.pod[k] = 0;
+    }
+
+    if (causa === "agotamiento") {
+      p.energia = 0;
+      SND.play("dano");
+      UI.consejo(`${p.nombre}: murio por agotamiento.`, 2500);
+    } else {
+      UI.consejo(`${p.nombre}: perdio todas sus vidas.`, 2500);
+    }
+
+    if (!vivos().length) {
+      M.finT = 1.5;
+    }
+  }
+
   /* ---------- Daño ---------- */
   function herir(p, causa) {
     if (!p.vivo || p.invul > 0) return;
@@ -226,14 +270,19 @@ const Juego = (() => {
     if (causa === "veneno") mostrarDato("veneno");
     if (causa === "caza") mostrarDato("caza");
     if (causa === "rayo") UI.consejo("Un rayo con aviso: cuando veas la línea, sal de ahí.");
-    if (p.vidas <= 0) { p.vivo = false; p.vy = -170; p.vx = 70; p.invul = 0; if (!vivos().length) setTimeout(perderTodo, 1500); }
+    if (p.vidas <= 0) {
+      morir(p, causa);
+    }
   }
 
   /* ---------- Vista de cóndor ---------- */
   function activarVista(p) {
     if (!p.vivo || p.comiendo) return;
     if (p.vistaEspera > 0 || p.energia < FISICA.vistaCoste) { if (p.vistaEspera <= 0) UI.consejo("Necesitas más energía para la Vista de cóndor."); return; }
-    p.energia -= FISICA.vistaCoste; p.vistaEspera = FISICA.vistaEspera; p.vistaT = FISICA.vistaDuracion;
+    if (!consumirEnergia(p, FISICA.vistaCoste)) return;
+
+    p.vistaEspera = FISICA.vistaEspera;
+    p.vistaT = FISICA.vistaDuracion;
     M.vistaT = FISICA.vistaDuracion; partida.vistas++;
     SND.play("vista");
     if (partida.vistas >= 5) otorgar("ojo");
@@ -243,9 +292,16 @@ const Juego = (() => {
   /* ---------- Alas y aleteo ---------- */
   function aletear(p) {
     const F = FISICA, c = CONDORES[p.sexo];
-    if (p.energia < 0.5) { tip("sinEnergia", "Sin energía: planea y baja a comer carroña."); return false; }
+    if (!p.vivo) return false;
+
     const desdeSuelo = p.suelo;
-    p.energia = Math.max(0, p.energia - F.aleteoCoste * c.coste * (desdeSuelo ? F.despegueMultiplicador : 1));
+
+    const coste = F.aleteoCoste * c.coste
+      * (desdeSuelo ? F.despegueMultiplicador : 1);
+
+    if (!consumirEnergia(p, coste)) {
+      return false;
+    }
     p.vy = -F.aleteoImpulso * (desdeSuelo ? 1.12 : 1) * (0.92 + 0.1 * c.agil);
     p.espera = F.aleteoEspera; p.aleteoT = 0.42; p.glideT = 0;
 
@@ -304,11 +360,69 @@ const Juego = (() => {
     p.vx = 0; p.vy = 0; p.dir = 1; p.dirV = 1; p.dirS = 1; p.suelo = Math.abs(p.y - ty) < 4;
     animarAlas(p, dt); actualizarPose(p, dt, {});
   }
+
+  function consumirEnergia(p, cantidad) {
+
+    if (!p.vivo) return false;
+
+    p.energia = Math.max(0, p.energia - cantidad);
+
+    if (p.energia <= 0) {
+      morir(p, "agotamiento");
+      return false;
+    }
+
+    const porcentaje = p.energia / p.energiaMax;
+
+    if (porcentaje <= FISICA.energiaCritica) {
+
+      if (p.energiaAlerta < 2) {
+        UI.consejo("Energia critica: busca alimento.", 3000);
+      }
+
+      p.energiaAlerta = 2;
+
+    } else if (porcentaje <= FISICA.energiaBaja) {
+
+      if (p.energiaAlerta < 1) {
+        UI.consejo("Energia baja: evita aletear demasiado.", 3000);
+      }
+
+      p.energiaAlerta = 1;
+
+    } else {
+      p.energiaAlerta = 0;
+    }
+
+    return true;
+  }
+
   function actualizarJugador(p, dt) {
     const F = FISICA;
     if (!p.vivo) {
-      p.vy += 520 * dt; p.x += p.vx * dt; p.vx *= 0.995; p.rot += dt * 3;
-      p.y = Math.min(p.y + p.vy * dt, M.suelo(p.x) - 8); return;
+
+      const piso = M.suelo(p.x) - 8;
+
+      if (p.y < piso && !p.suelo) {
+
+        p.vy += 520 * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+
+        p.rot = Math.min(Math.PI / 2, p.rot + dt * 3);
+
+      } else {
+
+        p.y = piso;
+        p.vx = 0;
+        p.vy = 0;
+        p.suelo = true;
+
+        p.rot += (Math.PI / 2 - p.rot)
+          * Math.min(1, dt * 8);
+      }
+
+      return;
     }
     if (p.auto) { autopiloto(p, dt); return; }
     const e = entrada(p), c = CONDORES[p.sexo];
@@ -322,10 +436,18 @@ const Juego = (() => {
     animarAlas(p, dt);
 
     if (p.comiendo) {
+
+      if (!consumirEnergia(p, F.energiaReposo * dt)) return;
+
       actualizarComer(p, e, dt);
-      actualizarPose(p, dt, e);
+
+      if (p.vivo) {
+        actualizarPose(p, dt, e);
+      }
+
       return;
     }
+
     // horizontal: ← y → llevan al cóndor a cada lado (en el aire y caminando). Sin tocar nada, sigue hacia donde mira.
     if (e.izq && !e.der) p.dir = -1; else if (e.der && !e.izq) p.dir = 1;
     const dir = p.dir;
@@ -360,9 +482,19 @@ const Juego = (() => {
     if (!p.suelo) {
       if (e.picada) p.vy = Math.min(F.picadaVel, p.vy + F.picadaAcel * dt);
       else p.vy += (F.gravedad - (F.gravedad / (F.hundimiento * (p.pod.rafaga > 0 ? F.rafagaHund : 1))) * (p.vy - aire)) * dt;
-      p.energia = Math.max(0, p.energia - F.energiaPasiva * dt);
+      const consumo = p.enTermica || p.pod.termica > 0
+        ? F.energiaTermica
+        : F.energiaPasiva;
+
+      if (!consumirEnergia(p, consumo * dt)) return;
     }
-    if (e.aletear && p.espera <= 0) aletear(p);
+
+    if (e.aletear && p.espera <= 0) {
+      aletear(p);
+
+      if (!p.vivo) return;
+    }
+
     if (p.enTermica) {
       p.termicaT = (p.termicaT || 0) + dt;
       tip("termica", "¡Térmica! Aquí vas más despacio y subes gratis. Para quedarte más, alterna ← y →.");
@@ -373,7 +505,9 @@ const Juego = (() => {
     p.enTormenta = false;
     for (const s of M.tormentas) {
       if (Math.abs(p.x - s.x) < s.w / 2) {
-        p.enTormenta = true; p.energia = Math.max(0, p.energia - 3 * dt); sacudida = Math.max(sacudida, 2);
+        p.enTormenta = true;
+        if (!consumirEnergia(p, F.energiaTormenta * dt)) return;
+        sacudida = Math.max(sacudida, 2);
         if (p.y < 340) p.vy += 330 * dt;
       }
     }
@@ -387,7 +521,18 @@ const Juego = (() => {
     const piso = M.suelo(p.x) - 18;
     if (p.suelo) { p.y = piso; p.vy = 0; }
     else if (p.y >= piso && p.vy >= 0) {
-      if (p.vy > 260) { p.energia = Math.max(0, p.energia - 4); emitir(p.x, p.y + 16, 8, ["#b69a6a", "#d2b98a"], { vel: 90, tam: 3.5 }); }
+      if (p.vy > 260) {
+
+        if (!consumirEnergia(p, 4)) return;
+
+        emitir(
+          p.x,
+          p.y + 16,
+          8,
+          ["#b69a6a", "#d2b98a"],
+          { vel: 90, tam: 3.5 }
+        );
+      }
       p.y = piso;
       p.vy = 0;
       p.suelo = true;
@@ -409,11 +554,11 @@ const Juego = (() => {
     if (p.mult > p.multPrev) { p.avisoT = 1.3; p.avisoTxt = "Planeo ×" + p.mult; }
     p.multPrev = p.mult;
     peligros(p);
+    if (!p.vivo) return;
     recoger(p, dt);
     if (p.pod.termica > 0 && Math.random() < dt * 16) emitir(p.x + (Math.random() - 0.5) * 60, p.y + 34, 1, ["#ffb25a", "#ffd9a0"], { ang: -Math.PI / 2, abre: 0.6, vel: 90, g: -30, tam: 4, vida: 0.7 });
     if (p.pod.rafaga > 0 && Math.random() < dt * 22) emitir(p.x - 40, p.y + (Math.random() - 0.5) * 50, 1, ["#8fe58a", "#d4ffcf"], { ang: Math.PI, abre: 0.3, vel: 160, g: 0, tam: 3.5, vida: 0.45 });
     actualizarPose(p, dt, e);
-    if (p.energia <= 0 && !p.suelo) tip("sinEnergia", "Sin energía: planea y baja a comer carroña.");
   }
 
   function peligros(p) {
@@ -429,6 +574,7 @@ const Juego = (() => {
         }
       }
     }
+    if (!p.vivo) return;
     // carroña
     for (const c of M.carronas) {
       if (c.estado === 0 && !c.por && !p.comiendo && p.noComer <= 0 && Math.abs(p.x - c.x) < 52 && p.y > M.suelo(c.x) - 72) { iniciarComer(p, c); break; }
@@ -582,13 +728,30 @@ const Juego = (() => {
     for (const k in p.pod) p.pod[k] = 0;
   }
   function activarControl(c) {
-    c.activo = true; M.control = c; SND.play("control");
-    emitir(c.x, M.suelo(c.x) - 90, 22, ["#ffe08a", "#ffffff", "#ffcf55"], { vel: 210, g: 60, tam: 5, vida: 1 });
-    vivos().forEach((p) => { p.energia = Math.min(p.energiaMax, p.energia + 25); });
-    const caidos = jugadores.filter((p) => !p.vivo);
-    caidos.forEach((p) => revivir(p, c, 1));
+
+    c.activo = true;
+    M.control = c;
+
+    SND.play("control");
+
+    emitir(
+      c.x,
+      M.suelo(c.x) - 90,
+      22,
+      ["#ffe08a", "#ffffff", "#ffcf55"],
+      { vel: 210, g: 60, tam: 5, vida: 1 }
+    );
+
+    vivos().forEach((p) => {
+      p.energia = Math.min(p.energiaMax, p.energia + 25);
+    });
+
     const n = M.controles.filter((q) => q.activo).length;
-    UI.consejo(caidos.length ? "¡Tu pareja volvió a volar desde la bandera!" : `Punto de control ${n} de ${M.controles.length}: si pierdes todas las vidas, vuelves aquí.`, 3800);
+
+    UI.consejo(
+      `Punto de control ${n} de ${M.controles.length}: +25 de energia.`,
+      3800
+    );
   }
   function actualizarControles(dt) {
     for (const c of M.controles) {
@@ -598,13 +761,12 @@ const Juego = (() => {
     }
   }
   function perderTodo() {
+
     if (estado !== "jugando" && estado !== "llegando") return;
+
     if (vivos().length) return;
-    if (M.control) {
-      jugadores.forEach((p) => { revivir(p, M.control, 2); p.puntos = Math.floor(p.puntos * 0.9); });
-      cam = clamp(M.control.x - 300, 0, M.L - 640); sacudida = 0; destello = 0.6; destelloColor = "255,240,200";
-      UI.consejo("¡Volviste al punto de control! (−10 % de puntos)", 3600); SND.play("control");
-    } else terminarPartida(false);
+
+    terminarPartida(false);
   }
 
   /* ---------- Entidades ---------- */
@@ -685,8 +847,18 @@ const Juego = (() => {
     const vm = v.reduce((s, p) => s + Math.hypot(p.vx, p.vy), 0) / v.length;
     SND.viento(clamp(vm / 340, 0, 1));
 
-    if (estado === "llegando") actualizarLlegada(dt);
+    if (!vivos().length) {
 
+      M.finT -= dt;
+
+      if (M.finT <= 0) {
+        perderTodo();
+        return;
+      }
+
+    } else if (estado === "llegando") {
+      actualizarLlegada(dt);
+    }
     hudT -= dt;
     if (hudT <= 0) { hudT = 0.1; UI.hudActualizar(estadoHud()); }
   }
@@ -718,7 +890,9 @@ const Juego = (() => {
     let bonus = 0;
     vivos().forEach((p) => { bonus += Math.round(p.energia * 2 + p.vidas * 100); });
     M.resultado = { pct, aleteoPct, danos, bonus };
-    partida.vidasIni = jugadores.map((p) => Math.min(FISICA.vidas, Math.max(1, p.vidas) + (p.vidas < FISICA.vidas ? 1 : 0)));
+    partida.vidasIni = jugadores.map((p) =>
+      p.vivo ? Math.min(FISICA.vidas, p.vidas + 1) : 0
+    );
     if (aleteoPct < 12) otorgar("planeador");
     if (pct === 100 && M.seguras > 0) otorgar("limpiador");
     if (danos === 0) otorgar("intocable");
